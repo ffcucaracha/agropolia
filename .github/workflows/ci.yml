@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, i-0]
+
+jobs:
+  backend-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -U pip
+      - run: pip install -e './backend[test]'
+      - run: python -m compileall -q backend/agropolia backend/alembic tests
+      - run: pytest -q tests/unit
+
+  backend-integration:
+    runs-on: ubuntu-latest
+    env:
+      AGROPOLIA_ENV: test
+      AGROPOLIA_DATABASE_URL: postgresql+asyncpg://agropolia:agropolia@localhost:5432/agropolia
+      AGROPOLIA_REDIS_URL: redis://localhost:6379/0
+      AGROPOLIA_NATS_URL: nats://localhost:4222
+      AGROPOLIA_JWT_SECRET: ci-only-secret-with-at-least-32-characters
+      AGROPOLIA_OTP_SECRET: ci-only-otp-secret-with-at-least-32-chars
+      AGROPOLIA_DEV_OTP_CODE: '000000'
+      AGROPOLIA_RUN_INTEGRATION: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: cp .env.example .env
+      - run: docker compose up -d --wait postgres redis nats
+      - run: pip install -e './backend[test]'
+      - name: Migrate clean database
+        working-directory: backend
+        run: alembic upgrade head
+      - run: pytest -q tests/integration tests/security
+      - if: always()
+        run: docker compose logs postgres redis nats
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test -- --run
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env
+      - run: docker compose build backend-api backend-worker client
+
+  e2e-i0:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        working-directory: apps/client
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - run: cp .env.example .env
+      - run: docker compose up -d --build --wait postgres redis nats backend-api client
+      - run: docker compose run --rm backend-api alembic upgrade head
+      - name: Wait for web and API
+        run: |
+          for i in {1..60}; do curl -fsS http://127.0.0.1:8000/health/live && curl -fsS http://127.0.0.1:5173 >/dev/null && exit 0; sleep 2; done
+          exit 1
+      - name: Run I-0 browser flow
+        working-directory: apps/client
+        run: npm run e2e
+      - if: always()
+        run: docker compose logs backend-api client postgres redis nats
