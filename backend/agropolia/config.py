@@ -26,10 +26,24 @@ class Settings(BaseSettings):
     web_origin: str = "http://localhost:5173"
     cookie_secure: bool = False
 
+    auth_email_enabled: bool = True
+    auth_phone_enabled: bool = False
+    email_delivery_mode: Literal["dev", "smtp"] = "dev"
+
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str = "no-reply@agropolia.local"
+    smtp_from_name: str = "Агрополия"
+    smtp_starttls: bool = True
+    smtp_ssl: bool = False
+
     access_ttl_minutes: int = 15
     refresh_ttl_days: int = 30
     preauth_ttl_minutes: int = 10
     otp_ttl_seconds: int = 300
+    otp_resend_cooldown_seconds: int = 60
     otp_attempt_limit: int = 5
     otp_attempt_window_seconds: int = 900
 
@@ -40,12 +54,23 @@ class Settings(BaseSettings):
     ios_recommended_version: str = "0.1.0"
     ios_minimum_supported_version: str = "0.1.0"
 
-
     @model_validator(mode="after")
-    def validate_production_secrets(self) -> "Settings":
+    def validate_runtime(self) -> "Settings":
+        if not self.auth_email_enabled and not self.auth_phone_enabled:
+            raise ValueError("at least one authentication method must be enabled")
+        if self.auth_phone_enabled:
+            raise ValueError("phone authentication is not implemented in I-0")
+        if self.env == "production" and self.email_delivery_mode != "smtp":
+            raise ValueError("production email OTP requires SMTP delivery mode")
+        if self.email_delivery_mode == "smtp" and not self.smtp_host:
+            raise ValueError("SMTP host is required when email delivery mode is smtp")
         if self.env == "production" and (len(self.jwt_secret) < 32 or len(self.otp_secret) < 32):
             raise ValueError("production JWT/OTP secrets must be at least 32 characters")
         return self
+
+    @property
+    def enabled_auth_methods(self) -> list[str]:
+        return ["email"] if self.auth_email_enabled else []
 
     @property
     def version_policies(self) -> dict[str, PlatformVersionPolicy]:
@@ -64,6 +89,5 @@ class Settings(BaseSettings):
 
 
 @lru_cache
-
 def get_settings() -> Settings:
     return Settings()
