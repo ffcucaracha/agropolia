@@ -3,10 +3,9 @@ from __future__ import annotations
 import hashlib
 import hmac
 import re
-from typing import Literal
-
 
 PHONE_RE = re.compile(r"^\+[1-9]\d{9,14}$")
+EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def normalize_phone(value: str) -> str:
@@ -19,6 +18,13 @@ def normalize_phone(value: str) -> str:
     normalized = "+" + digits
     if not PHONE_RE.fullmatch(normalized):
         raise ValueError("Некорректный номер телефона")
+    return normalized
+
+
+def normalize_email(value: str) -> str:
+    normalized = value.strip().lower()
+    if len(normalized) > 254 or not EMAIL_RE.fullmatch(normalized):
+        raise ValueError("Некорректный email")
     return normalized
 
 
@@ -45,6 +51,6 @@ def secret_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def otp_digest(secret: str, phone: str, device_id: str, purpose: str, code: str) -> str:
-    message = f"{phone}|{device_id}|{purpose}|{code}".encode()
+def otp_digest(secret: str, method: str, identifier: str, device_id: str, purpose: str, code: str) -> str:
+    message = f"{method}|{identifier}|{device_id}|{purpose}|{code}".encode()
     return hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
