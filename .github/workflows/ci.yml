@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - run: npm install
       - run: npm run typecheck
       - run: npm test -- --run
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Install Playwright
         working-directory: apps/client
         run: |
@@ -83,7 +83,7 @@ jobs:
           npx playwright install --with-deps chromium
       - run: cp .env.example .env
       - run: docker compose up -d --build --wait postgres redis nats backend-api client
-      - run: docker compose run --rm backend-api alembic upgrade head
+      - run: docker compose exec backend-api alembic upgrade head
       - name: Wait for web and API
         run: |
           for i in {1..60}; do curl -fsS http://127.0.0.1:8000/health/live && curl -fsS http://127.0.0.1:5173 >/dev/null && exit 0; sleep 2; done
