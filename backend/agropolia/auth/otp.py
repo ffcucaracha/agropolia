@@ -37,6 +37,9 @@ class ResendLimiter(ABC):
     @abstractmethod
     async def acquire(self, key: str, ttl_seconds: int) -> None: ...
 
+    @abstractmethod
+    async def release(self, key: str) -> None: ...
+
 
 class InMemoryOtpStore(OtpStore):
     def __init__(self) -> None:
@@ -82,6 +85,9 @@ class InMemoryResendLimiter(ResendLimiter):
             raise DomainError("OTP_RESEND_TOO_SOON", "Повторный запрос кода пока недоступен", 429)
         self.until[key] = now + timedelta(seconds=ttl_seconds)
 
+    async def release(self, key: str) -> None:
+        self.until.pop(key, None)
+
 
 class RedisOtpStore(OtpStore):
     def __init__(self, redis_client) -> None:
@@ -109,6 +115,9 @@ class RedisResendLimiter(ResendLimiter):
         ok = await self.redis.set(key, "1", ex=ttl_seconds, nx=True)
         if not ok:
             raise DomainError("OTP_RESEND_TOO_SOON", "Повторный запрос кода пока недоступен", 429)
+
+    async def release(self, key: str) -> None:
+        await self.redis.delete(key)
 
 
 _RATE_LIMIT_LUA = """
@@ -170,17 +179,21 @@ class OtpService:
         return f"otp:resend:{secret_hash(f'{method}|{purpose}|{identifier}')[:40]}"
 
     async def request(self, method: str, identifier: str, device_id: str, purpose: str) -> str:
-        await self.resend_limiter.acquire(
-            self.resend_key(method, identifier, purpose),
-            self.settings.otp_resend_cooldown_seconds,
-        )
+        resend_key = self.resend_key(method, identifier, purpose)
+        challenge_key = self.key(method, identifier, device_id, purpose)
+        await self.resend_limiter.acquire(resend_key, self.settings.otp_resend_cooldown_seconds)
         code = self.settings.dev_otp_code if self.settings.env in {"development", "test"} else f"{secrets.randbelow(1_000_000):06d}"
         record = OtpRecord(
             digest=otp_digest(self.settings.otp_secret, method, identifier, device_id, purpose, code),
             expires_at=datetime.now(timezone.utc) + timedelta(seconds=self.settings.otp_ttl_seconds),
         )
-        await self.store.put(self.key(method, identifier, device_id, purpose), record, self.settings.otp_ttl_seconds)
-        await self.provider.deliver(identifier, code, self.settings.otp_ttl_seconds)
+        await self.store.put(challenge_key, record, self.settings.otp_ttl_seconds)
+        try:
+            await self.provider.deliver(identifier, code, self.settings.otp_ttl_seconds)
+        except Exception:
+            await self.store.delete(challenge_key)
+            await self.resend_limiter.release(resend_key)
+            raise
         return code
 
     async def verify(self, method: str, identifier: str, device_id: str, purpose: str, code: str) -> None:
