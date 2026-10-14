@@ -1,29 +1,36 @@
 from __future__ import annotations
 
 from typing import Literal
-from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from agropolia.security import normalize_phone
+from agropolia.security import normalize_email, normalize_phone
 
 
+AuthMethod = Literal["email", "phone"]
 OtpPurpose = Literal["login", "register"]
 
 
 class OtpRequest(BaseModel):
-    phone: str
+    method: AuthMethod
+    identifier: str
     device_id: str = Field(min_length=8, max_length=160)
     purpose: OtpPurpose
 
-    @field_validator("phone")
+    @field_validator("identifier")
     @classmethod
-    def normalize(cls, value: str) -> str:
-        return normalize_phone(value)
+    def normalize_identifier(cls, value: str, info) -> str:
+        method = info.data.get("method")
+        if method == "email":
+            return normalize_email(value)
+        if method == "phone":
+            return normalize_phone(value)
+        return value
 
 
 class OtpRequestResult(BaseModel):
     expires_in: int
+    resend_available_in: int
     dev_code: str | None = None
 
 
