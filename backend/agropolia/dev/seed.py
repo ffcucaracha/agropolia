@@ -5,13 +5,13 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from agropolia.auth.models import User
+from agropolia.auth.models import AuthIdentity, User
 from agropolia.config import get_settings
 from agropolia.db import SessionFactory, engine
 from agropolia.ids import uuid7
 from agropolia.organizations.models import Consent, Membership, Organization
 
-TEST_PHONE = "+79990000001"
+TEST_EMAIL = "test@agropolia.local"
 TEST_NAME = "Тестовый пользователь"
 TEST_ORG_TYPE = "KFH"
 TEST_ORG_INN = "9999999998"
@@ -26,11 +26,29 @@ async def seed() -> None:
 
     async with SessionFactory() as db:
         async with db.begin():
-            user = await db.scalar(select(User).where(User.phone == TEST_PHONE))
-            if user is None:
-                user = User(id=uuid7(), phone=TEST_PHONE, name=TEST_NAME)
+            identity = await db.scalar(
+                select(AuthIdentity).where(
+                    AuthIdentity.type == "email",
+                    AuthIdentity.normalized_value == TEST_EMAIL,
+                )
+            )
+            if identity is None:
+                user = User(id=uuid7(), name=TEST_NAME)
                 db.add(user)
                 await db.flush()
+                identity = AuthIdentity(
+                    id=uuid7(),
+                    user_id=user.id,
+                    type="email",
+                    value=TEST_EMAIL,
+                    normalized_value=TEST_EMAIL,
+                    verified_at=datetime.now(timezone.utc),
+                    is_primary=True,
+                )
+                db.add(identity)
+                await db.flush()
+            else:
+                user = await db.get(User, identity.user_id)
 
             organization = await db.scalar(
                 select(Organization).where(Organization.inn == TEST_ORG_INN)
@@ -41,7 +59,7 @@ async def seed() -> None:
                     type=TEST_ORG_TYPE,
                     inn=TEST_ORG_INN,
                     name=TEST_ORG_NAME,
-                    contact_phone=TEST_PHONE,
+                    contact_phone=None,
                 )
                 db.add(organization)
                 await db.flush()
@@ -84,7 +102,7 @@ async def seed() -> None:
 
     await engine.dispose()
     print("Development test user is ready:")
-    print(f"  phone: {TEST_PHONE}")
+    print(f"  email: {TEST_EMAIL}")
     print(f"  OTP:   {settings.dev_otp_code}")
     print(f"  org:   {TEST_ORG_NAME}")
     print(f"  INN:   {TEST_ORG_INN}")
