@@ -13,7 +13,7 @@ from agropolia.security import validate_inn
 from agropolia.shared.models import SecurityAuditLog
 from agropolia.organizations.models import Consent, Membership, Organization
 
-from .models import Session, User
+from .models import AuthIdentity, Session, User
 from .schemas import RegisterRequest, TokenPair
 from .tokens import TokenService
 
@@ -23,8 +23,13 @@ class AuthService:
         self.settings = settings
         self.tokens = token_service
 
-    async def find_user_by_phone(self, db: AsyncSession, phone: str) -> User | None:
-        return await db.scalar(select(User).where(User.phone == phone))
+    async def find_identity(self, db: AsyncSession, method: str, identifier: str) -> AuthIdentity | None:
+        return await db.scalar(
+            select(AuthIdentity).where(
+                AuthIdentity.type == method,
+                AuthIdentity.normalized_value == identifier,
+            )
+        )
 
     async def issue_session(self, db: AsyncSession, user_id: UUID, device_id: str) -> tuple[Session, TokenPair]:
         refresh = self.tokens.new_refresh_token()
@@ -44,13 +49,23 @@ class AuthService:
             expires_in=self.settings.access_ttl_minutes * 60,
         )
 
-    async def login(self, db: AsyncSession, phone: str, device_id: str, ip_address: str | None) -> TokenPair:
+    async def login(self, db: AsyncSession, method: str, identifier: str, device_id: str, ip_address: str | None) -> TokenPair:
         async with db.begin():
-            user = await self.find_user_by_phone(db, phone)
-            if user is None:
-                raise DomainError("AUTH_USER_NOT_FOUND", "Пользователь не зарегистрирован", 404)
+            identity = await self.find_identity(db, method, identifier)
+            if identity is None or identity.verified_at is None:
+                raise DomainError("AUTH_IDENTITY_NOT_FOUND", "Пользователь не зарегистрирован", 404)
+            user = await db.get(User, identity.user_id)
+            if user is None or user.status != "active":
+                raise DomainError("AUTH_IDENTITY_NOT_FOUND", "Пользователь не зарегистрирован", 404)
             session, tokens = await self.issue_session(db, user.id, device_id)
-            db.add(SecurityAuditLog(actor_id=user.id, action="auth.login", target_type="session", target_id=str(session.id), ip_address=ip_address, details={"device_id": device_id}))
+            db.add(SecurityAuditLog(
+                actor_id=user.id,
+                action="auth.login",
+                target_type="session",
+                target_id=str(session.id),
+                ip_address=ip_address,
+                details={"device_id": device_id, "method": method},
+            ))
         return tokens
 
     async def register(self, db: AsyncSession, request: RegisterRequest, registration: dict, ip_address: str | None) -> TokenPair:
@@ -60,22 +75,39 @@ class AuthService:
             inn = validate_inn(request.organization_inn)
         except ValueError as exc:
             raise DomainError("VALIDATION_ERROR", str(exc), 422) from exc
-        phone = str(registration["phone"])
+
+        method = str(registration["method"])
+        identifier = str(registration["identifier"])
         device_id = str(registration["device_id"])
+        if method not in self.settings.enabled_auth_methods:
+            raise DomainError("AUTH_METHOD_DISABLED", "Способ входа отключён", 400)
+
         async with db.begin():
-            if await self.find_user_by_phone(db, phone):
-                raise DomainError("AUTH_USER_EXISTS", "Пользователь уже зарегистрирован", 409)
+            if await self.find_identity(db, method, identifier):
+                raise DomainError("AUTH_IDENTITY_EXISTS", "Пользователь уже зарегистрирован", 409)
             duplicate = await db.scalar(select(Organization.id).where(Organization.inn == inn))
             if duplicate:
                 raise DomainError("ORG_INN_EXISTS", "Организация с таким ИНН уже существует", 409)
 
-            user = User(id=uuid7(), phone=phone, name=request.name.strip())
+            user = User(id=uuid7(), name=request.name.strip())
             organization = Organization(
                 id=uuid7(),
                 type=request.organization_type,
                 inn=inn,
                 name=request.organization_name.strip(),
-                contact_phone=phone,
+                contact_phone=None,
+            )
+            db.add_all([user, organization])
+            await db.flush()
+
+            identity = AuthIdentity(
+                id=uuid7(),
+                user_id=user.id,
+                type=method,
+                value=identifier,
+                normalized_value=identifier,
+                verified_at=datetime.now(timezone.utc),
+                is_primary=True,
             )
             membership = Membership(id=uuid7(), user_id=user.id, org_id=organization.id, role="owner")
             consent = Consent(
@@ -88,12 +120,18 @@ class AuthService:
                 device_context=device_id,
                 ip_address=ip_address,
             )
-            db.add_all([user, organization])
+            db.add_all([identity, membership, consent])
             await db.flush()
-            db.add_all([membership, consent])
-            await db.flush()
+
             session, tokens = await self.issue_session(db, user.id, device_id)
-            db.add(SecurityAuditLog(actor_id=user.id, action="auth.register", target_type="organization", target_id=str(organization.id), ip_address=ip_address, details={"session_id": str(session.id)}))
+            db.add(SecurityAuditLog(
+                actor_id=user.id,
+                action="auth.register",
+                target_type="organization",
+                target_id=str(organization.id),
+                ip_address=ip_address,
+                details={"session_id": str(session.id), "method": method},
+            ))
         return tokens
 
     async def refresh(self, db: AsyncSession, refresh_token: str, device_id: str, ip_address: str | None) -> TokenPair:
@@ -102,7 +140,9 @@ class AuthService:
         pair: TokenPair | None = None
         async with db.begin():
             session = await db.scalar(
-                select(Session).where(or_(Session.refresh_hash == token_hash, Session.previous_refresh_hash == token_hash)).with_for_update()
+                select(Session).where(
+                    or_(Session.refresh_hash == token_hash, Session.previous_refresh_hash == token_hash)
+                ).with_for_update()
             )
             if session is None:
                 raise DomainError("INVALID_REFRESH", "Сессия не найдена", 401)
@@ -114,7 +154,14 @@ class AuthService:
             if session.previous_refresh_hash == token_hash:
                 session.revoked_at = now
                 session.version += 1
-                db.add(SecurityAuditLog(actor_id=session.user_id, action="auth.refresh_reuse", target_type="session", target_id=str(session.id), ip_address=ip_address, details={}))
+                db.add(SecurityAuditLog(
+                    actor_id=session.user_id,
+                    action="auth.refresh_reuse",
+                    target_type="session",
+                    target_id=str(session.id),
+                    ip_address=ip_address,
+                    details={},
+                ))
                 reused = True
             else:
                 new_refresh = self.tokens.new_refresh_token()
@@ -123,7 +170,11 @@ class AuthService:
                 session.updated_at = now
                 session.version += 1
                 access = self.tokens.create_access(session.user_id, session.id)
-                pair = TokenPair(access_token=access, refresh_token=new_refresh, expires_in=self.settings.access_ttl_minutes * 60)
+                pair = TokenPair(
+                    access_token=access,
+                    refresh_token=new_refresh,
+                    expires_in=self.settings.access_ttl_minutes * 60,
+                )
         if reused:
             raise DomainError("REFRESH_REUSED", "Повторное использование refresh token; сессия отозвана", 401)
         assert pair is not None
@@ -134,5 +185,12 @@ class AuthService:
         if session and session.user_id == user_id and session.revoked_at is None:
             session.revoked_at = datetime.now(timezone.utc)
             session.version += 1
-            db.add(SecurityAuditLog(actor_id=user_id, action="auth.logout", target_type="session", target_id=str(session.id), ip_address=ip_address, details={}))
+            db.add(SecurityAuditLog(
+                actor_id=user_id,
+                action="auth.logout",
+                target_type="session",
+                target_id=str(session.id),
+                ip_address=ip_address,
+                details={},
+            ))
         await db.commit()
