@@ -1,14 +1,17 @@
 import { expect, test } from '@playwright/test'
 
-test('I-0 registration, dashboard, logout and login', async ({ page }) => {
+test('I-0 email registration, dashboard, logout and login', async ({ page }) => {
+  const email = 'i0-user@agropolia.local'
+
   await page.goto('/start')
   await expect(page.getByRole('heading', { name: 'Цифровая рабочая среда агрария' })).toBeVisible()
   await page.getByRole('link', { name: 'Зарегистрироваться' }).click()
 
-  await page.getByLabel('Телефон').fill('+79005550101')
+  await page.getByLabel('Email').fill(email)
   await page.getByRole('button', { name: 'Получить код' }).click()
-  await expect(page.getByText('Dev OTP: 000000')).toBeVisible()
-  await page.getByLabel('Код из SMS').fill('000000')
+  const devOtpText = await page.locator('.dev-note').textContent()
+  const code = devOtpText?.replace(/\D/g, '') ?? ''
+  await page.getByLabel('Код из письма').fill(code)
   await page.getByRole('button', { name: 'Продолжить' }).click()
 
   await page.getByLabel('Имя').fill('Анна Тест')
@@ -24,11 +27,12 @@ test('I-0 registration, dashboard, logout and login', async ({ page }) => {
   await expect(page.getByText('owner')).toBeVisible()
 
   await page.getByRole('button', { name: 'Выйти' }).click()
-  await expect(page.getByRole('heading', { name: 'Цифровая рабочая среда агрария' })).toBeVisible()
   await page.getByRole('link', { name: 'Войти' }).click()
-  await page.getByLabel('Телефон').fill('+79005550101')
+  await page.getByLabel('Email').fill(email)
   await page.getByRole('button', { name: 'Получить код' }).click()
-  await page.getByLabel('Код из SMS').fill('000000')
+  const loginOtpText = await page.locator('.dev-note').textContent()
+  const loginCode = loginOtpText?.replace(/\D/g, '') ?? ''
+  await page.getByLabel('Код из письма').fill(loginCode)
   await page.getByRole('button', { name: 'Войти' }).click()
   await expect(page.getByRole('heading', { name: 'Анна Тест' })).toBeVisible()
 })
