@@ -96,6 +96,6 @@ def downgrade() -> None:
         )
     )
     op.create_unique_constraint("uq_auth_users_phone", "users", ["phone"], schema="auth")
-    op.alter_column("organizations", "contact_phone", schema="org", existing_type=sa.String(32), nullable=False)
+    # Keep contact_phone nullable: email-only organizations have no legitimate phone value to restore.
     op.drop_index("ix_auth_identities_user_id", table_name="identities", schema="auth")
     op.drop_table("identities", schema="auth")
