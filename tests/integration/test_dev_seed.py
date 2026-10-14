@@ -1,9 +1,9 @@
 import pytest
 from sqlalchemy import func, select
 
-from agropolia.auth.models import User
+from agropolia.auth.models import AuthIdentity
 from agropolia.db import SessionFactory
-from agropolia.dev.seed import TEST_ORG_INN, TEST_PHONE, seed
+from agropolia.dev.seed import TEST_EMAIL, TEST_ORG_INN, seed
 from agropolia.organizations.models import Membership, Organization
 
 
@@ -13,25 +13,27 @@ async def test_dev_seed_is_idempotent():
     await seed()
 
     async with SessionFactory() as db:
-        user_count = await db.scalar(
-            select(func.count()).select_from(User).where(User.phone == TEST_PHONE)
-        )
-        org_count = await db.scalar(
-            select(func.count()).select_from(Organization).where(
-                Organization.inn == TEST_ORG_INN
+        identity_count = await db.scalar(
+            select(func.count()).select_from(AuthIdentity).where(
+                AuthIdentity.type == "email",
+                AuthIdentity.normalized_value == TEST_EMAIL,
             )
         )
-        user = await db.scalar(select(User).where(User.phone == TEST_PHONE))
+        identity = await db.scalar(
+            select(AuthIdentity).where(
+                AuthIdentity.type == "email",
+                AuthIdentity.normalized_value == TEST_EMAIL,
+            )
+        )
         organization = await db.scalar(
             select(Organization).where(Organization.inn == TEST_ORG_INN)
         )
         membership_count = await db.scalar(
             select(func.count()).select_from(Membership).where(
-                Membership.user_id == user.id,
+                Membership.user_id == identity.user_id,
                 Membership.org_id == organization.id,
             )
         )
 
-    assert user_count == 1
-    assert org_count == 1
+    assert identity_count == 1
     assert membership_count == 1
