@@ -9,10 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agropolia.config import Settings, get_settings
 from agropolia.db import get_db
 from agropolia.errors import DomainError
-from agropolia.integrations.sms import DevelopmentOtpProvider, SmsOtpProvider
+from agropolia.integrations.email import DevelopmentEmailOtpProvider, SmtpEmailOtpProvider
 
 from .dependencies import AuthContext, get_auth_context
-from .otp import OtpService, RedisAttemptLimiter, RedisOtpStore
+from .otp import OtpService, RedisAttemptLimiter, RedisOtpStore, RedisResendLimiter
 from .schemas import LogoutRequest, OtpRequest, OtpRequestResult, OtpVerifyRequest, OtpVerifyResult, RefreshRequest, RegisterRequest, TokenPair
 from .service import AuthService
 from .tokens import TokenService
@@ -35,11 +35,16 @@ def _auth_service(settings: Settings = Depends(_settings), tokens: TokenService 
 
 def _otp_service(request: Request, settings: Settings = Depends(_settings)) -> OtpService:
     redis_client: Redis = request.app.state.redis
-    provider = DevelopmentOtpProvider() if settings.env in {"development", "test"} else SmsOtpProvider()
+    provider = (
+        DevelopmentEmailOtpProvider()
+        if settings.email_delivery_mode == "dev"
+        else SmtpEmailOtpProvider(settings)
+    )
     return OtpService(
         settings=settings,
         store=RedisOtpStore(redis_client),
         limiter=RedisAttemptLimiter(redis_client, settings.otp_attempt_limit, settings.otp_attempt_window_seconds),
+        resend_limiter=RedisResendLimiter(redis_client),
         provider=provider,
     )
 
@@ -78,10 +83,26 @@ def _client_tokens(response: Response, tokens: TokenPair, platform: str | None, 
     return tokens
 
 
+def _ensure_method_enabled(method: str, settings: Settings) -> None:
+    if method not in settings.enabled_auth_methods:
+        raise DomainError("AUTH_METHOD_DISABLED", "Способ входа отключён", 400)
+
+
 @router.post("/otp/request", response_model=OtpRequestResult)
-async def request_otp(payload: OtpRequest, otp: OtpService = Depends(_otp_service), settings: Settings = Depends(_settings)) -> OtpRequestResult:
-    code = await otp.request(payload.phone, payload.device_id, payload.purpose)
-    return OtpRequestResult(expires_in=settings.otp_ttl_seconds, dev_code=code if settings.env in {"development", "test"} else None)
+async def request_otp(
+    payload: OtpRequest,
+    otp: OtpService = Depends(_otp_service),
+    settings: Settings = Depends(_settings),
+) -> OtpRequestResult:
+    _ensure_method_enabled(payload.method, settings)
+    if payload.method != "email":
+        raise DomainError("AUTH_METHOD_DISABLED", "В I-0 доступна только авторизация по email", 400)
+    code = await otp.request(payload.method, payload.identifier, payload.device_id, payload.purpose)
+    return OtpRequestResult(
+        expires_in=settings.otp_ttl_seconds,
+        resend_available_in=settings.otp_resend_cooldown_seconds,
+        dev_code=code if settings.email_delivery_mode == "dev" else None,
+    )
 
 
 @router.post("/otp/verify", response_model=OtpVerifyResult)
@@ -96,10 +117,19 @@ async def verify_otp(
     settings: Settings = Depends(_settings),
     db: AsyncSession = Depends(get_db),
 ) -> OtpVerifyResult:
-    await otp.verify(payload.phone, payload.device_id, payload.purpose, payload.code)
+    _ensure_method_enabled(payload.method, settings)
+    await otp.verify(payload.method, payload.identifier, payload.device_id, payload.purpose, payload.code)
     if payload.purpose == "register":
-        return OtpVerifyResult(registration_token=tokens.create_registration(payload.phone, payload.device_id))
-    pair = await auth.login(db, payload.phone, payload.device_id, _client_ip(request))
+        return OtpVerifyResult(
+            registration_token=tokens.create_registration(payload.method, payload.identifier, payload.device_id)
+        )
+    pair = await auth.login(
+        db,
+        payload.method,
+        payload.identifier,
+        payload.device_id,
+        _client_ip(request),
+    )
     return OtpVerifyResult(tokens=_client_tokens(response, pair, x_client_platform, settings))
 
 
