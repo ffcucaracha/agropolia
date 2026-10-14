@@ -22,7 +22,7 @@ Production-проект «Агрополия». Источник требова�
 ```bash
 cp .env.example .env
 docker compose up -d --build --wait
-docker compose run --rm backend-api alembic upgrade head
+docker compose exec backend-api alembic upgrade head
 ```
 
 После запуска:
@@ -39,7 +39,9 @@ curl http://localhost:8000/health/live
 curl http://localhost:8000/health/ready
 ```
 
-Development OTP задаётся переменной `AGROPOLIA_DEV_OTP_CODE`. Возврат OTP в API разрешён только для `development/test`; production-конфигурация должна использовать реальный SMS provider.
+В I-0 аутентификация выполняется **только по email**. Телефонный OTP отсутствует. Разрешённые способы входа задаются серверной конфигурацией; endpoint `GET /api/v1/config/auth` сообщает клиенту доступные методы.
+
+Development OTP задаётся переменной `AGROPOLIA_DEV_OTP_CODE`. При `AGROPOLIA_EMAIL_DELIVERY_MODE=dev` код возвращается только в development/test API для удобства разработки. Для реальной отправки email установите `AGROPOLIA_EMAIL_DELIVERY_MODE=smtp` и SMTP-параметры. В production разрешён только SMTP mode.
 
 Остановка:
 
@@ -60,7 +62,7 @@ docker compose down -v
 ```bash
 cp .env.example .env
 docker compose up -d --build --wait postgres redis nats backend-api backend-worker
-docker compose run --rm backend-api alembic upgrade head
+docker compose exec backend-api alembic upgrade head
 ```
 
 Критичные переменные окружения:
@@ -74,6 +76,47 @@ docker compose run --rm backend-api alembic upgrade head
 - server-side Android/iOS version policy variables.
 
 Production secrets нельзя брать из `.env.example` или хранить в Git. Для production они должны приходить из Vault/KMS/корпоративного secret storage.
+
+### 2.1. Email OTP
+
+I-0 использует email как единственный login identifier. Основные параметры:
+
+```env
+AGROPOLIA_AUTH_EMAIL_ENABLED=true
+AGROPOLIA_AUTH_PHONE_ENABLED=false
+AGROPOLIA_OTP_TTL_SECONDS=300
+AGROPOLIA_OTP_RESEND_COOLDOWN_SECONDS=60
+AGROPOLIA_EMAIL_DELIVERY_MODE=dev
+```
+
+Для SMTP:
+
+```env
+AGROPOLIA_EMAIL_DELIVERY_MODE=smtp
+AGROPOLIA_SMTP_HOST=smtp.example.ru
+AGROPOLIA_SMTP_PORT=587
+AGROPOLIA_SMTP_USERNAME=<smtp-user>
+AGROPOLIA_SMTP_FROM_EMAIL=no-reply@example.ru
+AGROPOLIA_SMTP_FROM_NAME=Агрополия
+AGROPOLIA_SMTP_STARTTLS=true
+AGROPOLIA_SMTP_SSL=false
+```
+
+Пароль SMTP задаётся переменной `AGROPOLIA_SMTP_PASSWORD` только через secret storage / локальный `.env`, не через Git.
+
+После миграций dev/test пользователя можно создать идемпотентной командой:
+
+```bash
+docker compose exec backend-api python -m agropolia.dev.seed
+```
+
+Тестовый пользователь I-0:
+
+```text
+Email: test@agropolia.local
+OTP: значение AGROPOLIA_DEV_OTP_CODE (по умолчанию 000000)
+Организация: Тестовое КФХ
+```
 
 ### 3. Frontend
 
@@ -131,7 +174,7 @@ apps/client/dist/
 - backup/PITR для PostgreSQL;
 - firewall/network ACL;
 - monitoring/alerts;
-- production SMS provider;
+- production SMTP/email provider;
 - production sizing и нагрузочное тестирование.
 
 ### 5. Сборка Android APK
