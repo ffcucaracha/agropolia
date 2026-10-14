@@ -9,5 +9,18 @@ router = APIRouter(prefix="/config", tags=["config"])
 
 
 @router.get("/client-version")
-async def client_version(x_client_platform: str = Header(alias="X-Client-Platform"), x_client_version: str = Header(alias="X-Client-Version")):
+async def client_version(
+    x_client_platform: str = Header(alias="X-Client-Platform"),
+    x_client_version: str = Header(alias="X-Client-Version"),
+):
     return evaluate_version(x_client_platform.lower(), x_client_version, get_settings())
+
+
+@router.get("/auth")
+async def auth_config():
+    settings = get_settings()
+    return {
+        "methods": settings.enabled_auth_methods,
+        "otp_ttl_seconds": settings.otp_ttl_seconds,
+        "otp_resend_cooldown_seconds": settings.otp_resend_cooldown_seconds,
+    }
