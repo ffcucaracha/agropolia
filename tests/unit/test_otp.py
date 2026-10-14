@@ -52,3 +52,45 @@ async def test_resend_cooldown():
     with pytest.raises(DomainError) as exc:
         await otp.request("email", "user@example.test", "device-0001", "login")
     assert exc.value.code == "OTP_RESEND_TOO_SOON"
+
+
+class FailingEmailProvider:
+    async def deliver(self, email: str, code: str, ttl_seconds: int) -> None:
+        raise RuntimeError("smtp unavailable")
+
+
+@pytest.mark.asyncio
+async def test_delivery_failure_releases_challenge_and_resend_cooldown():
+    settings = Settings(
+        env="development",
+        dev_otp_code="123456",
+        otp_resend_cooldown_seconds=60,
+    )
+    store = InMemoryOtpStore()
+    resend = InMemoryResendLimiter()
+    otp = OtpService(
+        settings,
+        store,
+        InMemoryAttemptLimiter(5, 900),
+        resend,
+        FailingEmailProvider(),
+    )
+
+    with pytest.raises(DomainError) as exc:
+        await otp.request(
+            "email",
+            "delivery@example.test",
+            "device-delivery",
+            "login",
+        )
+    assert exc.value.code == "OTP_DELIVERY_FAILED"
+
+    # A failed delivery must not consume the resend window.
+    with pytest.raises(DomainError) as second:
+        await otp.request(
+            "email",
+            "delivery@example.test",
+            "device-delivery",
+            "login",
+        )
+    assert second.value.code == "OTP_DELIVERY_FAILED"
