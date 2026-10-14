@@ -23,7 +23,7 @@ class Organization(Base):
     type: Mapped[str] = mapped_column(String(16), nullable=False)
     inn: Mapped[str] = mapped_column(String(12), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    contact_phone: Mapped[str] = mapped_column(String(32), nullable=False)
+    contact_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
