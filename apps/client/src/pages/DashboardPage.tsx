@@ -19,7 +19,7 @@ export function DashboardPage() {
   return <Layout><section className="card dashboard">
     <div className="row"><div><p className="eyebrow">АГРОПОЛИЯ</p><h1>{user.name || 'Пользователь'}</h1></div><button className="link-button" onClick={() => void logout()}>Выйти</button></div>
     <dl>
-      <div><dt>Телефон</dt><dd>{user.phone_masked}</dd></div>
+      <div><dt>Email</dt><dd>{user.identifier_masked}</dd></div>
       <div><dt>Организация</dt><dd>{organization.name}</dd></div>
       <div><dt>Тип</dt><dd>{organization.type}</dd></div>
       <div><dt>ИНН</dt><dd>{organization.inn}</dd></div>
