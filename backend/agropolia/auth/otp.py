@@ -172,7 +172,10 @@ class OtpService:
 
     @staticmethod
     def key(method: str, identifier: str, device_id: str, purpose: str) -> str:
-        return f"otp:{secret_hash(f'{method}|{purpose}|{identifier}|{device_id}')[:40]}"
+        # One active challenge per method + identifier + purpose.
+        # device_id remains part of the OTP digest, so a challenge requested
+        # from another device replaces the previous one instead of sharing it.
+        return f"otp:{secret_hash(f'{method}|{purpose}|{identifier}')[:40]}"
 
     @staticmethod
     def resend_key(method: str, identifier: str, purpose: str) -> str:
