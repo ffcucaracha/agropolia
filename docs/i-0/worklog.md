@@ -295,3 +295,24 @@ docker compose run --rm backend-api alembic upgrade head
 ## Финальный статус автоматической проверки
 
 На последнем полном прогоне до обновления документации GitHub Actions run #20 завершился со статусом **success** по всем пяти jobs. После документальных изменений README/worklog CI запускается повторно; изменения не затрагивают application code.
+
+
+## Изменение auth scope — 2026-10-14
+
+### Перед реализацией
+- Меняю I-0 с телефонного OTP на email OTP.
+- Закладываю `AuthIdentity`, чтобы способ входа не был полем `User`.
+- Разрешённые auth methods определяются серверной конфигурацией; в I-0 включён только `email`.
+- Добавляю стандартный SMTP adapter, TTL OTP и отдельный resend cooldown.
+- Телефонный OTP и SMS provider удаляются из I-0.
+- Планируемые изменения: auth models/schemas/service/router, Alembic migration, Redis OTP keys, SMTP integration, login/register UI, dashboard, dev seed, tests, README.
+
+### Результат
+- Добавлена `auth.identities` с уникальностью `(type, normalized_value)`, `verified_at` и primary identity.
+- Существующие телефоны при миграции сохраняются как phone identities, но phone authentication в I-0 отключена.
+- OTP API принимает `method + identifier`; I-0 разрешает только `email`.
+- Email OTP поддерживает SMTP, configurable TTL и resend cooldown; при ошибке доставки challenge/cooldown откатываются.
+- Добавлен `GET /api/v1/config/auth`; UI показывает selector только при наличии более одного разрешённого метода.
+- Dev seed переведён на `test@agropolia.local`.
+- Dashboard показывает masked primary identifier вместо phone.
+- Browser/integration/security/unit tests переведены на email auth; окончательный статус фиксируется после CI.
