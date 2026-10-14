@@ -39,9 +39,9 @@ class TokenService:
     def decode_access(self, token: str) -> dict[str, Any]:
         return self._decode(token, "access")
 
-    def create_registration(self, phone: str, device_id: str) -> str:
+    def create_registration(self, method: str, identifier: str, device_id: str) -> str:
         return self._encode(
-            {"typ": "registration", "phone": phone, "device_id": device_id},
+            {"typ": "registration", "method": method, "identifier": identifier, "device_id": device_id},
             timedelta(minutes=self.settings.preauth_ttl_minutes),
         )
 
