@@ -6,12 +6,13 @@ Create Date: 2026-10-14
 """
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
 
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from agropolia.ids import uuid7
 
 revision = "20261014_0002"
 down_revision = "20261001_0001"
@@ -59,7 +60,7 @@ def upgrade() -> None:
             identities,
             [
                 {
-                    "id": uuid.uuid4(),
+                    "id": uuid7(),
                     "user_id": row.id,
                     "type": "phone",
                     "value": row.phone,
