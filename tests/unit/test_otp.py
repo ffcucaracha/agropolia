@@ -94,3 +94,45 @@ async def test_delivery_failure_releases_challenge_and_resend_cooldown():
             "login",
         )
     assert second.value.code == "OTP_DELIVERY_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_new_challenge_replaces_previous_device_challenge():
+    settings = Settings(
+        env="development",
+        dev_otp_code="123456",
+        otp_resend_cooldown_seconds=60,
+    )
+    store = InMemoryOtpStore()
+    resend = InMemoryResendLimiter()
+    otp = OtpService(
+        settings,
+        store,
+        InMemoryAttemptLimiter(5, 900),
+        resend,
+        DevelopmentEmailOtpProvider(),
+    )
+    identifier = "replace@example.test"
+    purpose = "login"
+
+    await otp.request("email", identifier, "device-old", purpose)
+    await resend.release(otp.resend_key("email", identifier, purpose))
+    await otp.request("email", identifier, "device-new", purpose)
+
+    with pytest.raises(DomainError) as exc:
+        await otp.verify(
+            "email",
+            identifier,
+            "device-old",
+            purpose,
+            "123456",
+        )
+    assert exc.value.code == "OTP_INVALID"
+
+    await otp.verify(
+        "email",
+        identifier,
+        "device-new",
+        purpose,
+        "123456",
+    )
