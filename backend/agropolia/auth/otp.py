@@ -190,10 +190,14 @@ class OtpService:
         await self.store.put(challenge_key, record, self.settings.otp_ttl_seconds)
         try:
             await self.provider.deliver(identifier, code, self.settings.otp_ttl_seconds)
-        except Exception:
+        except Exception as exc:
             await self.store.delete(challenge_key)
             await self.resend_limiter.release(resend_key)
-            raise
+            raise DomainError(
+                "OTP_DELIVERY_FAILED",
+                "Не удалось отправить код. Повторите позже",
+                503,
+            ) from exc
         return code
 
     async def verify(self, method: str, identifier: str, device_id: str, purpose: str, code: str) -> None:
