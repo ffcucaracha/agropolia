@@ -211,6 +211,14 @@
 - npm lockfile: top-level версии pinned, но lockfile невозможно достоверно сгенерировать в текущей offline-среде; должен быть создан после `npm install` в среде с registry и закоммичен до production release.
 
 ### Миграции
+- `backend/alembic/versions/20261014_0002_auth_identities_email.py`:
+  - создаёт `auth.identities`;
+  - переносит существующие телефоны из `auth.users.phone` в phone identities для сохранения данных;
+  - удаляет `auth.users.phone`;
+  - делает `org.organizations.contact_phone` необязательным;
+  - новые login identities создаются как email identities.
+
+
 - `backend/alembic/versions/20261001_0001_i0_foundation.py`:
   - PostGIS extension;
   - schemas `auth`, `org`, `shared`;
@@ -315,4 +323,5 @@ docker compose run --rm backend-api alembic upgrade head
 - Добавлен `GET /api/v1/config/auth`; UI показывает selector только при наличии более одного разрешённого метода.
 - Dev seed переведён на `test@agropolia.local`.
 - Dashboard показывает masked primary identifier вместо phone.
-- Browser/integration/security/unit tests переведены на email auth; окончательный статус фиксируется после CI.
+- Browser/integration/security/unit tests переведены на email auth.
+- GitHub Actions run #98: `backend-unit`, `backend-integration`, `frontend`, `docker-build`, `e2e-i0` — **success**.
