@@ -1,10 +1,10 @@
 import { create } from 'zustand'
-import { api, clientPlatform, deviceId } from '../api/client'
+import { api, deviceId } from '../api/client'
 import { refreshTokenStore } from '../persistence/tokens'
 
 export type TokenPair = { access_token: string; refresh_token?: string | null; token_type: string; expires_in: number }
 export type Me = {
-  user: { id: string; name: string | null; phone_masked: string }
+  user: { id: string; name: string | null; auth_method: string; identifier_masked: string }
   organization: { id: string; type: string; inn: string; name: string }
   membership: { role: string }
 }
