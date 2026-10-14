@@ -1,4 +1,4 @@
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json ./
 RUN npm install -g npm@12.2.0 && npm install
