@@ -8,7 +8,8 @@ from pydantic import BaseModel
 class UserView(BaseModel):
     id: UUID
     name: str | None
-    phone_masked: str
+    auth_method: str
+    identifier_masked: str
 
 
 class OrganizationView(BaseModel):
