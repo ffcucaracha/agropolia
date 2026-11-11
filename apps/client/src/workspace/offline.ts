@@ -16,9 +16,10 @@ export type PendingOperation = {
   payload: Record<string, unknown>
   state: 'queued' | 'error'
   error?: string
+  details?: unknown[]
 }
 
-type Result = { client_op_id: string; state: 'applied' | 'duplicate' | 'rejected'; result?: unknown; code?: string; message?: string }
+type Result = { client_op_id: string; state: 'applied' | 'duplicate' | 'rejected'; result?: unknown; code?: string; message?: string; details?: unknown[] }
 
 let syncing = false
 const listeners = new Set<() => void>()
@@ -98,7 +99,7 @@ export async function flushQueue(): Promise<Result[]> {
       const done = new Set(response.results.filter((r) => r.state !== 'rejected').map((r) => r.client_op_id))
       queue = queue.filter((row) => !done.has(row.client_op_id)).map((row) => {
         const rejected = response.results.find((result) => result.client_op_id === row.client_op_id && result.state === 'rejected')
-        return rejected ? { ...row, state: 'error' as const, error: rejected.message } : row
+        return rejected ? { ...row, state: 'error' as const, error: rejected.message, details: rejected.details } : row
       })
       await saveQueue(queue)
       if (response.results.some((r) => r.state === 'rejected')) break
@@ -122,8 +123,12 @@ export async function loadCollection<T extends { id: string }>(path: string): Pr
     await storage.set(key(`cache:${path}`), rows)
   } catch {
     const cached = await storage.get<T[]>(key(`cache:${path}`))
-    if (!cached) throw new Error('Нет связи и сохранённых данных')
-    rows = cached
+    const hasPendingCreate = (await pendingOperations()).some((op) =>
+      (path.startsWith('/fields') && op.type === 'field.create') ||
+      (path.startsWith('/observations') && op.type === 'observation.create') ||
+      (path.startsWith('/tasks') && op.type === 'task.create'))
+    if (!cached && !hasPendingCreate) throw new Error('Нет связи и сохранённых данных')
+    rows = cached ?? []
   }
   // Optimistic local projections are used only in the absence of a server row.
   const pending = await pendingOperations()

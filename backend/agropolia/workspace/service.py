@@ -89,9 +89,12 @@ def assert_owner(context: TenantContext) -> None:
         raise DomainError("PERMISSION_DENIED", "Недостаточно прав", 403)
 
 
-def require_version(current: int, base: int | None) -> None:
+def require_version(current: int, base: int | None, server_state: dict) -> None:
     if base is None or current != base:
-        raise DomainError("CONFLICT", "Данные изменились. Обновите страницу и повторите действие.", 409)
+        raise DomainError(
+            "CONFLICT", "Данные изменились. Проверьте версию сервера.", 409,
+            details=[{"base_version": base, "current_version": current, "server_state": server_state}],
+        )
 
 
 async def operation(
@@ -142,7 +145,7 @@ async def operation(
                 raise DomainError("NOT_FOUND", "Поле не найдено", 404)
             if entity.source != "manual":
                 raise DomainError("PERMISSION_DENIED", "Поля Meteo нельзя редактировать здесь", 403)
-            require_version(entity.version, command.base_version)
+            require_version(entity.version, command.base_version, field_view(entity))
             data = FieldEdit.model_validate(payload)
             entity.name = data.name.strip()
             entity.crop_name = data.crop_name.strip()
@@ -189,7 +192,7 @@ async def operation(
             if command.entity_id is None:
                 raise DomainError("VALIDATION_ERROR", "Нужен ID задачи", 422)
             entity = await owned_task(db, org, command.entity_id, lock=True)
-            require_version(entity.version, command.base_version)
+            require_version(entity.version, command.base_version, task_view(entity))
             data = TaskTransition.model_validate(payload)
             transitions = {
                 "new": {"accepted", "blocked"},

@@ -58,11 +58,12 @@ async def scheduler_loop(stop: asyncio.Event) -> None:
         try:
             await scan_due_tasks()
             await prune_sync_operations()
-        except Exception:
-            # Keep worker alive; next scan retries. Exceptions are observed via
-            # the worker logger rather than written with sensitive payloads.
+        except Exception as exc:
+            # Never include SQL bind parameters or personal data in operational logs.
             import logging
-            logging.getLogger("agropolia.scheduler").exception("scheduler_scan_failed")
+            logging.getLogger("agropolia.scheduler").error(
+                "scheduler_scan_failed", extra={"error_type": type(exc).__name__}
+            )
         try:
             await asyncio.wait_for(stop.wait(), timeout=get_settings().task_reminder_scan_seconds)
         except TimeoutError:

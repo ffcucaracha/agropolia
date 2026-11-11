@@ -260,7 +260,8 @@ async def sync_ops(
         except DomainError as exc:
             await db.rollback()
             results.append({"client_op_id": str(item.client_op_id),
-                            "state": "rejected", "code": exc.code, "message": exc.message})
+                            "state": "rejected", "code": exc.code, "message": exc.message,
+                            "details": exc.details})
         except Exception:
             await db.rollback()
             raise

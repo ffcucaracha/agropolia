@@ -14,14 +14,18 @@ export function ObservationsPage() {
   const [fieldId, setFieldId] = useState('')
   const [kind, setKind] = useState('')
   const [search, setSearch] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const fieldNames = new Map(fields.data?.map((f) => [f.id, f.name]) ?? [])
-  const entries = (data ?? []).filter((x) => (!fieldId || x.field_id === fieldId) && (!kind || x.kind === kind) && x.text.toLowerCase().includes(search.toLowerCase()))
+  const entries = (data ?? []).filter((x) => (!fieldId || x.field_id === fieldId) && (!kind || x.kind === kind) && x.text.toLowerCase().includes(search.toLowerCase()) && (!from || x.taken_at.slice(0, 10) >= from) && (!to || x.taken_at.slice(0, 10) <= to))
   return <>
     <PageHead title="Журнал наблюдений" subtitle="Приватные записи вашего хозяйства" action={{ to: '/app/observations/new', text: 'Отметить' }} />
     <div className="filters">
       <label>Поле<select value={fieldId} onChange={(e) => setFieldId(e.target.value)}><option value="">Все поля</option>{fields.data?.map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}</select></label>
       <label>Тип<select value={kind} onChange={(e) => setKind(e.target.value)}><option value="">Все типы</option>{Object.entries(observationKinds).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <label>Поиск<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Описание" /></label>
+      <label>С<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+      <label>По<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
     </div>
     {error != null && <ErrorMessage error={error} />}
     {entries.length === 0 && <StateMessage>Наблюдений по выбранным фильтрам нет.</StateMessage>}

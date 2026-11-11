@@ -111,6 +111,7 @@ export function SettingsPage() {
       {pending.map((item) => <div key={item.client_op_id} className="list-item">
         <span>{item.type} · {item.state === 'error' ? 'Ошибка' : 'Ожидает отправки'}</span>
         {item.error && <span className="error">{item.error}</span>}
+        {item.details?.length ? <span className="muted">Локальные данные: {JSON.stringify(item.payload)}. Версия сервера: {JSON.stringify(item.details)}</span> : null}
         <button className="button secondary" type="button" onClick={() => void retryOperation(item.client_op_id)}>Повторить</button>
       </div>)}
     </section>

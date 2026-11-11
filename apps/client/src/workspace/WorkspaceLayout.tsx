@@ -4,7 +4,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuthStore, type Me } from '../auth/store'
 import { flushQueue, onQueueChange, queueCount } from './offline'
-import { flushMedia } from './mediaQueue'
+import { flushMedia, mediaQueue } from './mediaQueue'
 
 const links = [
   { to: '/app', name: 'Сегодня', end: true },
@@ -64,8 +64,15 @@ export function WorkspaceLayout() {
     }
   }, [userId, orgId, queryClient])
 
+  async function safelyLogout() {
+    const queued = await queueCount().catch(() => 0)
+    const photos = await mediaQueue().then((items) => items.length).catch(() => 0)
+    if (queued + photos > 0 && !window.confirm('Есть неотправленные изменения. При выходе они будут удалены. Продолжить?')) return
+    await logout()
+  }
+
   if (me.isLoading) return <main className="shell"><section className="card">Загрузка хозяйства…</section></main>
-  if (me.isError || !me.data) return <main className="shell"><section className="card"><p className="error">Не удалось получить хозяйство.</p><button className="button secondary" onClick={() => void logout()}>Выйти</button></section></main>
+  if (me.isError || !me.data) return <main className="shell"><section className="card"><p className="error">Не удалось получить хозяйство.</p><button className="button secondary" onClick={() => void safelyLogout()}>Выйти</button></section></main>
 
   return <div className="workspace">
     <header className="workspace-header">
@@ -73,7 +80,7 @@ export function WorkspaceLayout() {
       <div className="workspace-session">
         {!online && <span className="status-note">Нет связи</span>}
         {pending > 0 && <span className="status-note">{pending} в очереди</span>}
-        <button className="link-button" onClick={() => void logout()}>Выйти</button>
+        <button className="link-button" onClick={() => void safelyLogout()}>Выйти</button>
       </div>
     </header>
     <nav className="workspace-nav" aria-label="Разделы хозяйства">

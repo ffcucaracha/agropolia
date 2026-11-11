@@ -13,14 +13,14 @@ export function MediaGallery({ ownerType, ownerId }: { ownerType: OwnerType; own
   })
   const [sources, setSources] = useState<string[]>([])
   const [queued, setQueued] = useState(0)
+  const [localSources, setLocalSources] = useState<string[]>([])
   useEffect(() => {
     let alive = true
     const objectUrls: string[] = []
-    void pendingMedia(ownerType, ownerId).then(async (items) => {
-      if (alive) setQueued(items.length)
-      for (const item of items) {
-        objectUrls.push(URL.createObjectURL(item.blob))
-      }
+    void pendingMedia(ownerType, ownerId).then((items) => {
+      const urls = items.map((item) => URL.createObjectURL(item.blob))
+      objectUrls.push(...urls)
+      if (alive) { setQueued(items.length); setLocalSources(urls) }
     }).catch(() => undefined)
     if (media.data) {
       void Promise.all(media.data.map((item) => apiBlob(`/media-file/${item.id}`)))
@@ -39,6 +39,6 @@ export function MediaGallery({ ownerType, ownerId }: { ownerType: OwnerType; own
     <h2>Фотографии</h2>
     {sources.length === 0 && queued === 0 && <p className="muted">Фотографии не прикреплены.</p>}
     {queued > 0 && <p className="pending-tag">{queued} фото ожидают отправки</p>}
-    <div className="photo-gallery">{sources.map((src, index) => <img key={src} src={src} alt={`Фото ${index + 1}`} />)}</div>
+    <div className="photo-gallery">{[...sources, ...localSources].map((src, index) => <img key={src} src={src} alt={`Фото ${index + 1}`} />)}</div>
   </div>
 }
