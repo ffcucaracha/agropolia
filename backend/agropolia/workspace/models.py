@@ -148,3 +148,23 @@ class ChangeLog(Base):
     entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class Media(Base):
+    __tablename__ = "media"
+    __table_args__ = (
+        UniqueConstraint("client_media_id", "org_id", name="upload_id_per_org"),
+        CheckConstraint("owner_type IN ('observation','task')", name="owner_type_valid"),
+        {"schema": "scouting"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("org.organizations.id"), nullable=False, index=True)
+    owner_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    uploaded_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("auth.users.id"), nullable=False)
+    client_media_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime: Mapped[str] = mapped_column(String(80), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
