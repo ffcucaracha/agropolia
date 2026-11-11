@@ -81,3 +81,7 @@ button:hover, .button:hover { filter: brightness(.96); }
  .stat strong { font-size: 27px; }
  .list-item { align-items: start; flex-direction: column; }
 }
+
+.photo-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin: 12px 0 18px; }
+.photo-gallery img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 9px; border: 1px solid #dce5db; }
+input[type="file"] { padding: 12px; height: auto; max-width: 100%; }
