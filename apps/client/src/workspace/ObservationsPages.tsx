@@ -2,6 +2,8 @@ import { FormEvent, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { loadCollection, submitCommand } from './offline'
+import { enqueuePhotos } from './mediaQueue'
+import { MediaGallery } from './MediaGallery'
 import type { Field, Observation } from './types'
 import { observationKinds } from './types'
 import { BackLink, ErrorMessage, formatDate, PageHead, PendingTag, StateMessage } from './ui'
@@ -29,6 +31,7 @@ export function ObservationsPage() {
       <p>{entry.text || 'Без описания'}</p>
       <p className="muted">{formatDate(entry.taken_at)}</p>
       <PendingTag pending={entry.pending} />
+    <MediaGallery ownerType="observation" ownerId={entry.id} />
     </Link>)}</div>
   </>
 }
@@ -41,12 +44,14 @@ export function ObservationFormPage() {
   const [fieldId, setFieldId] = useState(params.get('field') ?? '')
   const [kind, setKind] = useState<Observation['kind']>('crop_state')
   const [description, setDescription] = useState('')
+  const [photos, setPhotos] = useState<File[]>([])
   const [error, setError] = useState<unknown>(null)
   const [busy, setBusy] = useState(false)
   async function save(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError(null)
     try {
-      await submitCommand('observation.create', { field_id: fieldId, kind, text: description })
+      const saved = await submitCommand('observation.create', { field_id: fieldId, kind, text: description })
+      if (photos.length && saved.entityId) await enqueuePhotos('observation', saved.entityId, photos)
       await client.invalidateQueries({ queryKey: ['observations'] })
       navigate('/app/observations')
     } catch (e) { setError(e) }
@@ -61,6 +66,8 @@ export function ObservationFormPage() {
       <label>Поле<select required value={fieldId} onChange={(e) => setFieldId(e.target.value)}><option value="">Выберите поле</option>{fields.data?.map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}</select></label>
       <label>Тип наблюдения<select value={kind} onChange={(e) => setKind(e.target.value as Observation['kind'])}>{Object.entries(observationKinds).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       <label>Описание<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} maxLength={10000} placeholder="Что вы заметили на поле?" /></label>
+      <label>Фотографии (до 10)<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setPhotos(Array.from(event.target.files ?? []).slice(0, 10))} /></label>
+      {photos.length > 0 && <p className="muted">Выбрано: {photos.length}. Фото сохраняются приватно.</p>}
       {error && <ErrorMessage error={error} />}
       <button className="button primary" disabled={busy || !fieldId}>{busy ? 'Сохраняем…' : 'Сохранить наблюдение'}</button>
     </form>
