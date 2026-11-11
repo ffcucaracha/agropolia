@@ -73,7 +73,7 @@ export async function submitCommand(
   if (match?.state === 'rejected') {
     throw new Error(match.message || 'Операция отклонена сервером')
   }
-  return { queued: !match || match.state === 'rejected', result: match?.result as Record<string, unknown> | undefined, entityId: stableId }
+  return { queued: !match, result: match?.result as Record<string, unknown> | undefined, entityId: stableId }
 }
 
 export async function flushQueue(): Promise<Result[]> {
@@ -140,7 +140,7 @@ export async function loadCollection<T extends { id: string }>(path: string): Pr
         ...op.payload, id: op.entity_id, version: 1, created_at: now,
         pending: true, status: type === 'task' ? 'new' : undefined,
         source: type === 'field' ? 'manual' : undefined,
-      } as T)
+      } as unknown as T)
     }
     if ((op.type === 'field.update' || op.type === 'task.transition') && op.entity_id) {
       const current = byId.get(op.entity_id)
