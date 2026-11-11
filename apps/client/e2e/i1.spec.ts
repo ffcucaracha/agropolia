@@ -9,7 +9,7 @@ test('I-1 field, observation and task are persisted in the real backend', async 
   await page.getByLabel('Код из письма').fill(otp)
   await page.getByRole('button', { name: 'Продолжить' }).click()
   await page.getByLabel('Имя').fill('Полевой агроном')
-  await page.getByLabel('ИНН').fill('7707083893')
+  await page.getByLabel('ИНН').fill('3700010017')
   await page.getByLabel('Название хозяйства').fill('Хозяйство E2E I-1')
   await page.getByLabel('Согласен на обработку персональных данных').check()
   await page.getByRole('button', { name: 'Создать хозяйство' }).click()
