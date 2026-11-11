@@ -256,3 +256,18 @@ npx cap sync android
 ```
 
 Для device spike удобнее всего поднять отдельный test/stage backend с HTTPS и использовать его URL. Это одновременно позволяет корректно проверить CORS, refresh-cookie/native-token path, reconnect и сетевые сценарии.
+
+## I-1 web-first farm workspace (branch i-1)
+
+The autonomous farm workspace uses manual fields, private observations, tasks,
+work log, in-app notifications, and an IndexedDB operation queue. Meteo API is
+not connected; no fake weather or risk data is shown. See `docs/i-1/scope-and-plan.md`.
+
+Local development media files are stored privately under `backend/.media/`
+(outside Git), accessed **only through authenticated API endpoints**.
+Production requires `AGROPOLIA_MEDIA_STORAGE=s3` plus S3-compatible storage
+credentials in your secret store. Files stay in private buckets; no public URLs.
+
+Web offline operations are synchronized on reconnect/reopening the tab. Background
+sync after the browser process closes is not guaranteed. Native mobile readiness
+is tracked separately.
