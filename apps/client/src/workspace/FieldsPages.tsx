@@ -62,7 +62,7 @@ export function FieldFormPage() {
       <label>Культура<input value={crop} onChange={(e) => setCrop(e.target.value)} maxLength={120} required /></label>
       <label>Площадь, га<input type="number" step="0.001" min="0.001" value={area} onChange={(e) => setArea(e.target.value)} required /></label>
       <label>Дата сева (необязательно)<input type="date" value={sowingDate} onChange={(e) => setSowingDate(e.target.value)} /></label>
-      {error && <ErrorMessage error={error} />}
+      {error != null && <ErrorMessage error={error} />}
       <button className="button primary" disabled={busy}>{busy ? 'Сохраняем…' : 'Сохранить поле'}</button>
     </form>}
   </section>
