@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import Response
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
@@ -75,13 +75,12 @@ def compress_photo(raw: bytes) -> bytes:
         with Image.open(io.BytesIO(raw)) as src:
             if src.width * src.height > 40_000_000:
                 raise DomainError("MEDIA_TOO_LARGE", "Слишком большое разрешение фото", 413)
-            # The private copy preserves original EXIF metadata; public previews
-            # are out of scope. Access is checked on every media read.
-            exif = src.getexif().tobytes()
-            picture = src.convert("RGB")
+            # Geo consent is not enabled in this slice: strip all EXIF/GPS
+            # metadata, but honor orientation before transcoding.
+            picture = ImageOps.exif_transpose(src).convert("RGB")
             for quality in (86, 78, 68, 58, 48, 36):
                 out = io.BytesIO()
-                picture.save(out, format="JPEG", quality=quality, optimize=True, exif=exif)
+                picture.save(out, format="JPEG", quality=quality, optimize=True)
                 if out.tell() <= MAX_OUTPUT_BYTES:
                     return out.getvalue()
     except (UnidentifiedImageError, OSError, ValueError) as exc:
