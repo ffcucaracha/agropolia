@@ -23,7 +23,7 @@ export function ObservationsPage() {
       <label>Тип<select value={kind} onChange={(e) => setKind(e.target.value)}><option value="">Все типы</option>{Object.entries(observationKinds).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <label>Поиск<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Описание" /></label>
     </div>
-    {error && <ErrorMessage error={error} />}
+    {error != null && <ErrorMessage error={error} />}
     {entries.length === 0 && <StateMessage>Наблюдений по выбранным фильтрам нет.</StateMessage>}
     <div className="record-grid">{entries.map((entry) => <Link className="record-card" key={entry.id} to={`/app/observations/${entry.id}`}>
       <span className="tag">{observationKinds[entry.kind]}</span>
@@ -68,7 +68,7 @@ export function ObservationFormPage() {
       <label>Описание<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} maxLength={10000} placeholder="Что вы заметили на поле?" /></label>
       <label>Фотографии (до 10)<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setPhotos(Array.from(event.target.files ?? []).slice(0, 10))} /></label>
       {photos.length > 0 && <p className="muted">Выбрано: {photos.length}. Фото сохраняются приватно.</p>}
-      {error && <ErrorMessage error={error} />}
+      {error != null && <ErrorMessage error={error} />}
       <button className="button primary" disabled={busy || !fieldId}>{busy ? 'Сохраняем…' : 'Сохранить наблюдение'}</button>
     </form>
   </section>
