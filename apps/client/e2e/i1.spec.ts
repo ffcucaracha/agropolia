@@ -68,8 +68,10 @@ test('I-1 offline observation is stored and synced after reconnect', async ({ pa
   await page.getByLabel('Площадь, га').fill('20')
   await page.getByRole('button', { name: 'Сохранить поле' }).click()
   await page.getByRole('link', { name: 'Наблюдения', exact: true }).click()
-  await context.setOffline(true)
   await page.getByRole('link', { name: 'Отметить' }).click()
+  await expect(page.getByLabel('Поле')).toContainText('Поле офлайн')
+  // Simulate losing connectivity while entering an already-open field record.
+  await context.setOffline(true)
   await page.getByLabel('Поле').selectOption({ label: 'Поле офлайн' })
   await page.getByLabel('Описание').fill('Без сети')
   await page.getByRole('button', { name: 'Сохранить наблюдение' }).click()
