@@ -17,6 +17,7 @@ export function TodayPage() {
   const overdue = open.filter((task) => !!task.due_at && new Date(task.due_at) < now)
   return <>
     <PageHead title={me.data?.user.name || 'Сегодня'} subtitle="Рабочий день вашего хозяйства" />
+    <p className="muted">Организация: {me.data?.organization.name} · ИНН: {me.data?.organization.inn} · Роль: {me.data?.membership.role}</p>
     <div className="stat-row">
       <section className="stat"><span>Полей</span><strong>{fields.data?.length ?? 0}</strong></section>
       <section className="stat"><span>Открытых задач</span><strong>{open.length}</strong></section>
