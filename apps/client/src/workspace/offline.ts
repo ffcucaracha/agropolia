@@ -1,6 +1,7 @@
 import { api } from '../api/client'
 import { useAuthStore } from '../auth/store'
 import { workspacePersistence } from '../persistence/provider'
+import { queryClient } from '../api/queryClient'
 
 const storage = workspacePersistence
 
@@ -90,6 +91,9 @@ async function cacheCommand(item: PendingOperation, serverResult?: Record<string
     ? existing.map((row) => row.id === id ? { ...row, ...snapshot } : row)
     : [{ ...snapshot, id }, ...existing]
   await storage.set(cacheKey, updated)
+  // TanStack Query suspends network-mode queries while offline. Keep its
+  // in-memory projection consistent with IndexedDB before navigating.
+  queryClient.setQueryData([path.slice(1)], updated)
 }
 
 export async function submitCommand(

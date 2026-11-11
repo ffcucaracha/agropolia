@@ -72,7 +72,7 @@ export function WorkspaceLayout() {
   }
 
   if (me.isLoading) return <main className="shell"><section className="card">Загрузка хозяйства…</section></main>
-  if (me.isError || !me.data) return <main className="shell"><section className="card"><p className="error">Не удалось получить хозяйство.</p><button className="button secondary" onClick={() => void safelyLogout()}>Выйти</button></section></main>
+  if (!me.data) return <main className="shell"><section className="card"><p className="error">Не удалось получить хозяйство.</p><button className="button secondary" onClick={() => void safelyLogout()}>Выйти</button></section></main>
 
   return <div className="workspace">
     <header className="workspace-header">
