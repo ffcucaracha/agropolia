@@ -325,3 +325,11 @@ docker compose run --rm backend-api alembic upgrade head
 - Dashboard показывает masked primary identifier вместо phone.
 - Browser/integration/security/unit tests переведены на email auth.
 - GitHub Actions run #98: `backend-unit`, `backend-integration`, `frontend`, `docker-build`, `e2e-i0` — **success**.
+
+
+## Решение 2026-11-11 — закрытие web-first I-0
+
+- Реальная доставка email OTP подтверждена через тестовый SMTP/mail catcher.
+- Android/iOS device validation сознательно отложена; мобильный spike больше не блокирует web-first I-0.
+- Фокус следующего шага — web-версия и подготовка carry-over/I-1.
+- Текущий кодовый CI перед документальными изменениями: полностью зелёный по backend-unit, backend-integration, frontend, docker-build и e2e-i0.
