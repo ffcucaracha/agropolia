@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { api, deviceId } from '../api/client'
 import { refreshTokenStore } from '../persistence/tokens'
+import { clearWorkspaceCache } from '../persistence/indexeddb'
 
 export type TokenPair = { access_token: string; refresh_token?: string | null; token_type: string; expires_in: number }
 export type Me = {
@@ -12,16 +13,19 @@ export type Me = {
 type AuthState = {
   accessToken: string | null
   activeOrgId: string | null
+  userId: string | null
   hydrated: boolean
   setTokens(tokens: TokenPair): Promise<void>
   bootstrap(): Promise<void>
   logout(): Promise<void>
   setActiveOrg(id: string | null): void
+  setUserId(id: string | null): void
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken: null,
   activeOrgId: null,
+  userId: null,
   hydrated: false,
   async setTokens(tokens) {
     set({ accessToken: tokens.access_token })
@@ -36,9 +40,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       })
       await get().setTokens(tokens)
       const me = await api<Me>('/me')
-      set({ activeOrgId: me.organization.id })
+      set({ activeOrgId: me.organization.id, userId: me.user.id })
     } catch {
-      set({ accessToken: null, activeOrgId: null })
+      set({ accessToken: null, activeOrgId: null, userId: null })
       await refreshTokenStore.clear()
     } finally {
       set({ hydrated: true })
@@ -49,8 +53,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (get().accessToken) await api<void>('/auth/logout', { method: 'POST', body: JSON.stringify({}) })
     } finally {
       await refreshTokenStore.clear()
-      set({ accessToken: null, activeOrgId: null })
+      await clearWorkspaceCache().catch(() => undefined)
+      set({ accessToken: null, activeOrgId: null, userId: null })
     }
   },
   setActiveOrg(id) { set({ activeOrgId: id }) },
+  setUserId(id) { set({ userId: id }) },
 }))
