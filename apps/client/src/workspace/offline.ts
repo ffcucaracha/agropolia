@@ -149,7 +149,11 @@ export async function loadCollection<T extends { id: string }>(path: string): Pr
     }
     if ((op.type === 'field.update' || op.type === 'task.transition') && op.entity_id) {
       const current = byId.get(op.entity_id)
-      if (current) byId.set(op.entity_id, { ...current, ...op.payload, pending: true })
+      if (current) byId.set(op.entity_id, {
+        ...current, ...op.payload,
+        version: Number((current as { version?: number }).version ?? 0) + 1,
+        pending: true,
+      })
     }
   }
   return Array.from(byId.values())
