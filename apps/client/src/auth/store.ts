@@ -10,6 +10,10 @@ export type Me = {
   membership: { role: string }
 }
 
+// React StrictMode may mount effects twice; a rotating refresh token is single-use.
+// Exactly one bootstrap request may run at a time.
+let bootstrapPromise: Promise<void> | null = null
+
 type AuthState = {
   accessToken: string | null
   activeOrgId: string | null
@@ -32,20 +36,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (tokens.refresh_token) await refreshTokenStore.set(tokens.refresh_token)
   },
   async bootstrap() {
+    if (bootstrapPromise) return bootstrapPromise
+    bootstrapPromise = (async () => {
+      try {
+        const refresh = await refreshTokenStore.get()
+        const tokens = await api<TokenPair>('/auth/refresh', {
+          method: 'POST',
+          body: JSON.stringify({ refresh_token: refresh, device_id: deviceId() }),
+        })
+        await get().setTokens(tokens)
+        const me = await api<Me>('/me')
+        set({ activeOrgId: me.organization.id, userId: me.user.id })
+      } catch {
+        set({ accessToken: null, activeOrgId: null, userId: null })
+        await refreshTokenStore.clear()
+      } finally {
+        set({ hydrated: true })
+      }
+    })()
     try {
-      const refresh = await refreshTokenStore.get()
-      const tokens = await api<TokenPair>('/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({ refresh_token: refresh, device_id: deviceId() }),
-      })
-      await get().setTokens(tokens)
-      const me = await api<Me>('/me')
-      set({ activeOrgId: me.organization.id, userId: me.user.id })
-    } catch {
-      set({ accessToken: null, activeOrgId: null, userId: null })
-      await refreshTokenStore.clear()
+      await bootstrapPromise
     } finally {
-      set({ hydrated: true })
+      bootstrapPromise = null
     }
   },
   async logout() {
