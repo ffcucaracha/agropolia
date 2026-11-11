@@ -221,7 +221,7 @@ def test_i1_photo_private_content_and_tenant_acl():
         assert created.json()["size_bytes"] <= 1_500_000
         assert send().json()["id"] == created.json()["id"]
         content_id = created.json()["id"]
-        fetched = client.get(f"/api/v1/media/content/{content_id}", headers=auth)
+        fetched = client.get(f"/api/v1/media-file/{content_id}", headers=auth)
         assert fetched.status_code == 200 and fetched.content.startswith(b"\xff\xd8")
         assert fetched.headers["cache-control"] == "private, no-store"
         assert client.get(f"/api/v1/media/content/{content_id}", headers=other).status_code == 404
