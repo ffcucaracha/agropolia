@@ -29,8 +29,7 @@ export function TasksPage() {
       <p>{fieldsById.get(task.field_id) ?? 'Поле'} · {taskPriorities[task.priority]}</p>
       <p className="muted">Срок: {formatDate(task.due_at)}</p>
       <PendingTag pending={task.pending} />
-    <MediaGallery ownerType="task" ownerId={task.id} />
-    {task.status === 'in_progress' && <label>Фото подтверждения выполнения<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => setPhotos(Array.from(e.target.files ?? []).slice(0, 10))} /></label>}
+
     </Link>)}</div>
   </>
 }
@@ -78,7 +77,7 @@ export function TaskFormPage() {
       <label>Срок<input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} /></label>
       <label>Приоритет<select value={priority} onChange={(e) => setPriority(e.target.value as Task['priority'])}>{Object.entries(taskPriorities).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
       <label>Чек-лист (один пункт на строку)<textarea rows={3} value={checklist} onChange={(e) => setChecklist(e.target.value)} /></label>
-      {error && <ErrorMessage error={error} />}
+      {error != null && <ErrorMessage error={error} />}
       <button className="button primary" disabled={busy || !fieldId}>{busy ? 'Сохраняем…' : 'Создать задачу'}</button>
     </form>
   </section>
@@ -130,8 +129,10 @@ export function TaskDetailPage() {
     {task.blocked_reason && <p className="error">Причина блокировки: {task.blocked_reason}</p>}
     {task.completed_at && <p>Выполнена: {formatDate(task.completed_at)}</p>}
     <PendingTag pending={task.pending} />
+    <MediaGallery ownerType="task" ownerId={task.id} />
+    {task.status === 'in_progress' && <label>Фото подтверждения выполнения<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => setPhotos(Array.from(e.target.files ?? []).slice(0, 10))} /></label>}
     {transitions[task.status].some((item) => item.next === 'blocked') && <label className="block-reason">Причина блокировки<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Обязательно при блокировке" maxLength={1000} /></label>}
-    {error && <ErrorMessage error={error} />}
+    {error != null && <ErrorMessage error={error} />}
     <div className="button-row">{transitions[task.status].map(({ next, label }) => <button key={next} type="button"
       className={next === 'blocked' ? 'button secondary' : 'button primary'}
       onClick={() => void transition(next)} disabled={busy || (next === 'blocked' && !reason.trim())}>{label}</button>)}</div>
