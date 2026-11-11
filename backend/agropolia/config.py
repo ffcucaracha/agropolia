@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     smtp_ssl: bool = False
 
+    task_reminder_scan_seconds: int = 30
+    sync_idempotency_retention_days: int = 30
+
     media_storage: Literal["local", "s3"] = "local"
     media_dir: str = ".media"
     s3_endpoint: str | None = None
