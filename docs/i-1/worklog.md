@@ -60,8 +60,8 @@ Scope и критерии: `docs/i-1/scope-and-plan.md`. Draft PR: https://githu
 
 - **Реализуется:** реальные unit/integration/security/Playwright проверки; draft PR #5 остаётся unmerged.
 - **Файлы:** `tests/integration/test_i1_workspace.py`, `tests/integration/test_i1_scheduler.py`, `apps/client/e2e/i1.spec.ts`.
-- **Проверено:** на повторных запусках GitHub Actions успешно прошли backend-unit, backend-integration (на чистой PostgreSQL/PostGIS/Redis/NATS), frontend (TS typecheck, build, Vitest, audit), docker-build. Browser E2E для I-0 и online I-1 был зелёным, остался отдельный offline/reload регрессионный тест; single-flight fix находится на повторной проверке.
-- **Осталось до закрытия:** полный green status всех jobs для одного и того же head commit, ревью реального end-to-end media/offline сценария, проверка production storage и юридические согласия.
+- **Проверено:** на повторных запусках GitHub Actions успешно прошли backend-unit, backend-integration (на чистой PostgreSQL/PostGIS/Redis/NATS), frontend (TS typecheck, build, Vitest, audit), docker-build. GitHub Actions run [#43017195858](https://github.com/ffcucaracha/agropolia/actions/runs/43017195858) на commit `370ef2c893d46e3a2bbe953780ebb4082da9bebc` завершился **success** по всем пяти jobs, включая browser E2E I-0 + I-1 online + offline/reconnect. Причина прежней ошибки strict-mode refresh устранена single-flight bootstrap.
+- **Осталось до продуктовой/production приёмки:** отдельное ревью интеграции медиа + offline на целевых браузерах/устройствах, утверждённые юридические согласия и конфигурация production S3. Проверки CI проходят, но production deployment не выполнялся.
 
 ## Не закрыто этим slice
 
@@ -69,3 +69,11 @@ Scope и критерии: `docs/i-1/scope-and-plan.md`. Draft PR: https://githu
 - Полные `FR-FIELD-02` (KML/KMZ/контуры), `FR-OBS-02` (video/voice/STT/EXIF consent), `FR-OFFLINE-01/05` (native background/media + map cache), `FR-NOTIF-01` (push/бот/SMS), `FR-ORG-02/03` (staff), весь регулируемый контур/FR-TASK-04.
 - Начальные справочники/погодные thresholds не подменялись неподтверждёнными данными.
 - `main` не тронут; PR #5 draft, решение о merge отдельно.
+
+## Финальное исправление изоляции клиентского кэша
+
+После проверки повторного входа устранён риск переноса прежних tenant-owned React Query данных в новый пользовательский сеанс. На `setTokens/logout/bootstrap failure` очищается shared query cache; при выходе очищается и IndexedDB (с предупреждением о неотправленных операциях).
+
+- Файлы: `apps/client/src/api/queryClient.ts`, `apps/client/src/main.tsx`, `apps/client/src/auth/store.ts`.
+- Результат: в новом auth-контексте данные предыдущего пользователя не показываются из TanStack Query cache.
+- Проверка: GitHub Actions run #43017195858 — полный зелёный прогон, включая browser flows.
