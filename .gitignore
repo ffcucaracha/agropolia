@@ -12,3 +12,5 @@ dist/
 apps/client/android/
 apps/client/ios/
 .DS_Store
+
+backend/.media/

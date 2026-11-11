@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { api, deviceId } from '../api/client'
 import { refreshTokenStore } from '../persistence/tokens'
+import { clearWorkspaceCache } from '../persistence/indexeddb'
+import { queryClient } from '../api/queryClient'
 
 export type TokenPair = { access_token: string; refresh_token?: string | null; token_type: string; expires_in: number }
 export type Me = {
@@ -9,48 +11,68 @@ export type Me = {
   membership: { role: string }
 }
 
+// React StrictMode may mount effects twice; a rotating refresh token is single-use.
+// Exactly one bootstrap request may run at a time.
+let bootstrapPromise: Promise<void> | null = null
+
 type AuthState = {
   accessToken: string | null
   activeOrgId: string | null
+  userId: string | null
   hydrated: boolean
   setTokens(tokens: TokenPair): Promise<void>
   bootstrap(): Promise<void>
   logout(): Promise<void>
   setActiveOrg(id: string | null): void
+  setUserId(id: string | null): void
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken: null,
   activeOrgId: null,
+  userId: null,
   hydrated: false,
   async setTokens(tokens) {
+    // A new authenticated session must never see cached data of a previous user.
+    queryClient.clear()
     set({ accessToken: tokens.access_token })
     if (tokens.refresh_token) await refreshTokenStore.set(tokens.refresh_token)
   },
   async bootstrap() {
+    if (bootstrapPromise) return bootstrapPromise
+    bootstrapPromise = (async () => {
+      try {
+        const refresh = await refreshTokenStore.get()
+        const tokens = await api<TokenPair>('/auth/refresh', {
+          method: 'POST',
+          body: JSON.stringify({ refresh_token: refresh, device_id: deviceId() }),
+        })
+        await get().setTokens(tokens)
+        const me = await api<Me>('/me')
+        set({ activeOrgId: me.organization.id, userId: me.user.id })
+      } catch {
+        set({ accessToken: null, activeOrgId: null, userId: null })
+        await refreshTokenStore.clear()
+      } finally {
+        set({ hydrated: true })
+      }
+    })()
     try {
-      const refresh = await refreshTokenStore.get()
-      const tokens = await api<TokenPair>('/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({ refresh_token: refresh, device_id: deviceId() }),
-      })
-      await get().setTokens(tokens)
-      const me = await api<Me>('/me')
-      set({ activeOrgId: me.organization.id })
-    } catch {
-      set({ accessToken: null, activeOrgId: null })
-      await refreshTokenStore.clear()
+      await bootstrapPromise
     } finally {
-      set({ hydrated: true })
+      bootstrapPromise = null
     }
   },
   async logout() {
     try {
       if (get().accessToken) await api<void>('/auth/logout', { method: 'POST', body: JSON.stringify({}) })
     } finally {
+      queryClient.clear()
       await refreshTokenStore.clear()
-      set({ accessToken: null, activeOrgId: null })
+      await clearWorkspaceCache().catch(() => undefined)
+      set({ accessToken: null, activeOrgId: null, userId: null })
     }
   },
   setActiveOrg(id) { set({ activeOrgId: id }) },
+  setUserId(id) { set({ userId: id }) },
 }))

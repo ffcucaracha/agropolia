@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from agropolia.auth import models as auth_models  # noqa: F401
 from agropolia.organizations import models as org_models  # noqa: F401
 from agropolia.shared import models as shared_models  # noqa: F401
+from agropolia.workspace import models as workspace_models  # noqa: F401
 from agropolia.config import get_settings
 from agropolia.db import Base
 

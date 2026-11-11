@@ -10,6 +10,7 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const setTokens = useAuthStore((state) => state.setTokens)
   const setActiveOrg = useAuthStore((state) => state.setActiveOrg)
+  const setUserId = useAuthStore((state) => state.setUserId)
   const [stage, setStage] = useState<'identifier' | 'code' | 'details'>('identifier')
   const [method, setMethod] = useState('email')
   const [methods, setMethods] = useState<string[]>(['email'])
@@ -90,8 +91,9 @@ export function RegisterPage() {
         consent_accepted: consent,
       }) })
       await setTokens(tokens)
-      const me = await api<{ organization: { id: string } }>('/me')
+      const me = await api<{ user: { id: string }; organization: { id: string } }>('/me')
       setActiveOrg(me.organization.id)
+      setUserId(me.user.id)
       navigate('/app', { replace: true })
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось зарегистрироваться') }
     finally { setPending(false) }

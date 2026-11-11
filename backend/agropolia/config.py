@@ -39,6 +39,17 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     smtp_ssl: bool = False
 
+    task_reminder_scan_seconds: int = 30
+    sync_idempotency_retention_days: int = 30
+
+    media_storage: Literal["local", "s3"] = "local"
+    media_dir: str = ".media"
+    s3_endpoint: str | None = None
+    s3_bucket: str = "agropolia-media"
+    s3_region: str = "ru-central1"
+    s3_access_key: str | None = None
+    s3_secret_key: str | None = None
+
     access_ttl_minutes: int = 15
     refresh_ttl_days: int = 30
     preauth_ttl_minutes: int = 10
@@ -66,6 +77,10 @@ class Settings(BaseSettings):
             raise ValueError("SMTP host is required when email delivery mode is smtp")
         if self.env == "production" and (len(self.jwt_secret) < 32 or len(self.otp_secret) < 32):
             raise ValueError("production JWT/OTP secrets must be at least 32 characters")
+        if self.env == "production" and self.media_storage != "s3":
+            raise ValueError("production media requires an S3-compatible private storage provider")
+        if self.media_storage == "s3" and not (self.s3_access_key and self.s3_secret_key):
+            raise ValueError("S3 media storage credentials are missing")
         return self
 
     @property

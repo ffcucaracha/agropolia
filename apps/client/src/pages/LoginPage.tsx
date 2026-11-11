@@ -11,6 +11,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const setTokens = useAuthStore((state) => state.setTokens)
   const setActiveOrg = useAuthStore((state) => state.setActiveOrg)
+  const setUserId = useAuthStore((state) => state.setUserId)
   const [method, setMethod] = useState('email')
   const [methods, setMethods] = useState<string[]>(['email'])
   const [identifier, setIdentifier] = useState('')
@@ -72,8 +73,9 @@ export function LoginPage() {
       })
       if (!result.tokens) throw new Error('Сервер не вернул сессию')
       await setTokens(result.tokens)
-      const me = await api<{ organization: { id: string } }>('/me')
+      const me = await api<{ user: { id: string }; organization: { id: string } }>('/me')
       setActiveOrg(me.organization.id)
+      setUserId(me.user.id)
       navigate('/app', { replace: true })
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось войти') }
     finally { setPending(false) }

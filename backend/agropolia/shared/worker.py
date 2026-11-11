@@ -7,6 +7,9 @@ from nats.aio.client import Client as NATS
 
 from agropolia.config import get_settings
 from agropolia.shared.outbox import OutboxPublisher
+from agropolia.shared.nats import EventEnvelope
+from agropolia.workspace.notify_consumer import consume_task_event
+from agropolia.workspace.scheduler import scheduler_loop
 
 
 async def main() -> None:
@@ -22,10 +25,26 @@ async def main() -> None:
         await js.add_stream(name="AGROPOLIA_EVENTS", subjects=["events.>", "jobs.>"])
     except Exception:
         pass
+    async def on_task_event(message):
+        try:
+            envelope = EventEnvelope.decode(message.data)
+            await consume_task_event(envelope)
+            await message.ack()
+        except Exception:
+            await message.nak()
+
+    subscription = await js.subscribe(
+        "events.task.>", stream="AGROPOLIA_EVENTS",
+        durable="i1-task-notifications", manual_ack=True, cb=on_task_event,
+    )
     publisher = OutboxPublisher(js)
+    scheduler = asyncio.create_task(scheduler_loop(stop))
     try:
         await publisher.run(stop)
     finally:
+        stop.set()
+        await scheduler
+        await subscription.unsubscribe()
         await nc.drain()
 
 

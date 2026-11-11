@@ -16,6 +16,8 @@ from agropolia.logging import configure_logging
 from agropolia.middleware import RequestContextMiddleware
 from agropolia.organizations.router import router as organizations_router
 from agropolia.shared.router import router as config_router
+from agropolia.workspace.router import router as workspace_router
+from agropolia.workspace.media import router as media_router
 
 
 @asynccontextmanager
@@ -55,6 +57,8 @@ def create_app() -> FastAPI:
     api.include_router(auth_router)
     api.include_router(organizations_router)
     api.include_router(config_router)
+    api.include_router(workspace_router)
+    api.include_router(media_router)
     app.include_router(api)
 
     @app.get("/health/live", tags=["health"])
