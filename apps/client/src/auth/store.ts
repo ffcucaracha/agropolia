@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { api, deviceId } from '../api/client'
 import { refreshTokenStore } from '../persistence/tokens'
 import { clearWorkspaceCache } from '../persistence/indexeddb'
+import { queryClient } from '../api/queryClient'
 
 export type TokenPair = { access_token: string; refresh_token?: string | null; token_type: string; expires_in: number }
 export type Me = {
@@ -32,6 +33,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   userId: null,
   hydrated: false,
   async setTokens(tokens) {
+    // A new authenticated session must never see cached data of a previous user.
+    queryClient.clear()
     set({ accessToken: tokens.access_token })
     if (tokens.refresh_token) await refreshTokenStore.set(tokens.refresh_token)
   },
@@ -64,6 +67,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       if (get().accessToken) await api<void>('/auth/logout', { method: 'POST', body: JSON.stringify({}) })
     } finally {
+      queryClient.clear()
       await refreshTokenStore.clear()
       await clearWorkspaceCache().catch(() => undefined)
       set({ accessToken: null, activeOrgId: null, userId: null })
