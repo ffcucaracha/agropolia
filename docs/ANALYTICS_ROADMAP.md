@@ -219,7 +219,7 @@ email
 - CI;
 - unit/integration/security/browser E2E tests;
 - минимальный dashboard только на реально существующих данных;
-- обязательный Capacitor device technical spike.
+- Capacitor foundation сохраняется в кодовой базе; device validation Android/iOS переносится на отдельный mobile-readiness этап и не блокирует завершение web-first I-0.
 
 ### Не входит в критерий завершения I-0
 
@@ -267,7 +267,8 @@ I-0 считается завершённой, когда одновременн
 - transactional outbox/inbox + NATS подтверждены integration test;
 - client version policy работает;
 - CI и browser E2E зелёные;
-- Capacitor technical spike выполнен на целевых mobile runtime и его результаты задокументированы.
+- web-версия проходит полный browser E2E, а реальная email-доставка OTP подтверждена на тестовом SMTP/mail catcher;
+- mobile device validation Android/iOS явно отложена и не является exit criterion web-first I-0.
 
 ---
 
