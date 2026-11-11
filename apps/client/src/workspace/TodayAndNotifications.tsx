@@ -54,7 +54,7 @@ export function NotificationsPage() {
   }
   return <>
     <PageHead title="Уведомления" subtitle="События по задачам вашего хозяйства" />
-    {error && <ErrorMessage error={error} />}
+    {error != null && <ErrorMessage error={error} />}
     {notices.error && <ErrorMessage error={notices.error} />}
     {notices.data?.length === 0 && <StateMessage>Уведомлений пока нет.</StateMessage>}
     <div className="record-grid">{notices.data?.map((notice) => <section className="record-card" key={notice.id}>
@@ -101,7 +101,7 @@ export function SettingsPage() {
         <button className="button primary" disabled={busy}>Сохранить настройки</button>
       </form>
       {message && <p role="status">{message}</p>}
-      {error && <ErrorMessage error={error} />}
+      {error != null && <ErrorMessage error={error} />}
     </section>
     <section className="workspace-panel">
       <h2>Очередь синхронизации</h2>
