@@ -123,7 +123,7 @@ async def operation(
     try:
         if kind == "field.create":
             data = FieldCreate.model_validate(payload)
-            entity = Field(org_id=org, name=data.name.strip(), crop_name=data.crop_name.strip(),
+            entity = Field(id=command.entity_id or uuid7(), org_id=org, name=data.name.strip(), crop_name=data.crop_name.strip(),
                            area_ha=data.area_ha,
                            sowing_date=datetime.combine(data.sowing_date, time.min, tzinfo=timezone.utc)
                            if data.sowing_date else None, source="manual")
@@ -157,7 +157,7 @@ async def operation(
         elif kind == "observation.create":
             data = ObservationCreate.model_validate(payload)
             await owned_field(db, org, data.field_id)
-            entity = Observation(org_id=org, field_id=data.field_id, author_id=user,
+            entity = Observation(id=command.entity_id or uuid7(), org_id=org, field_id=data.field_id, author_id=user,
                                  kind=data.kind, text=data.text, taken_at=data.taken_at or utcnow(),
                                  visibility="private")
             db.add(entity)
@@ -172,7 +172,7 @@ async def operation(
                 observation = await owned_observation(db, org, data.observation_id)
                 if observation.field_id != data.field_id:
                     raise DomainError("VALIDATION_ERROR", "Наблюдение относится к другому полю", 422)
-            entity = Task(org_id=org, field_id=data.field_id, observation_id=data.observation_id,
+            entity = Task(id=command.entity_id or uuid7(), org_id=org, field_id=data.field_id, observation_id=data.observation_id,
                           author_id=user, assignee_id=user, title=data.title.strip(),
                           description=data.description, priority=data.priority,
                           due_at=data.due_at, checklist=data.checklist, status="new")
