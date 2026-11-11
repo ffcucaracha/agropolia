@@ -1,15 +1,21 @@
 import { expect, test } from '@playwright/test'
 
-test('I-1 field, observation and task are persisted in the real backend', async ({ page }) => {
+function validInn(prefix: string): string {
+  const weights = [2, 4, 10, 3, 5, 9, 4, 6, 8]
+  const check = prefix.split('').reduce((sum, digit, index) => sum + Number(digit) * weights[index], 0) % 11 % 10
+  return prefix + String(check)
+}
+
+test('I-1 field, observation and task are persisted in the real backend', async ({ page }, testInfo) => {
   await page.goto('/start')
   await page.getByRole('link', { name: 'Зарегистрироваться' }).click()
-  await page.getByLabel('Email').fill('i1-e2e@example.test')
+  await page.getByLabel('Email').fill(`i1-e2e-${testInfo.retry}@example.test`)
   await page.getByRole('button', { name: 'Получить код' }).click()
   const otp = (await page.locator('.dev-note').innerText()).replace(/[^0-9]/g, '')
   await page.getByLabel('Код из письма').fill(otp)
   await page.getByRole('button', { name: 'Продолжить' }).click()
   await page.getByLabel('Имя').fill('Полевой агроном')
-  await page.getByLabel('ИНН').fill('3700010017')
+  await page.getByLabel('ИНН').fill(validInn(`37000100${testInfo.retry + 1}`))
   await page.getByLabel('Название хозяйства').fill('Хозяйство E2E I-1')
   await page.getByLabel('Согласен на обработку персональных данных').check()
   await page.getByRole('button', { name: 'Создать хозяйство' }).click()
@@ -42,16 +48,16 @@ test('I-1 field, observation and task are persisted in the real backend', async 
   await expect(page.getByText('Осмотр листьев')).toBeVisible()
 })
 
-test('I-1 offline observation is stored and synced after reconnect', async ({ page, context }) => {
+test('I-1 offline observation is stored and synced after reconnect', async ({ page, context }, testInfo) => {
   await page.goto('/start')
   await page.getByRole('link', { name: 'Зарегистрироваться' }).click()
-  await page.getByLabel('Email').fill('i1-offline-e2e@example.test')
+  await page.getByLabel('Email').fill(`i1-offline-e2e-${testInfo.retry}@example.test`)
   await page.getByRole('button', { name: 'Получить код' }).click()
   const otp = (await page.locator('.dev-note').innerText()).replace(/[^0-9]/g, '')
   await page.getByLabel('Код из письма').fill(otp)
   await page.getByRole('button', { name: 'Продолжить' }).click()
   await page.getByLabel('Имя').fill('Офлайн агроном')
-  await page.getByLabel('ИНН').fill('3700010024')
+  await page.getByLabel('ИНН').fill(validInn(`37000100${testInfo.retry + 3}`))
   await page.getByLabel('Название хозяйства').fill('Офлайн хозяйство')
   await page.getByLabel('Согласен на обработку персональных данных').check()
   await page.getByRole('button', { name: 'Создать хозяйство' }).click()

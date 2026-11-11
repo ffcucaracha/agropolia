@@ -58,6 +58,40 @@ async function saveQueue(queue: PendingOperation[]) {
   changed()
 }
 
+type CachedEntity = Record<string, unknown> & { id: string }
+
+/**
+ * Persist the result before leaving the creation screen. Without this,
+ * a user who creates a field online and immediately loses network can
+ * see an old empty /fields cache even though the server committed it.
+ */
+async function cacheCommand(item: PendingOperation, serverResult?: Record<string, unknown>) {
+  const path = item.type.startsWith('field.') ? '/fields'
+    : item.type.startsWith('observation.') ? '/observations'
+    : item.type.startsWith('task.') ? '/tasks' : null
+  if (!path) return
+  if (!serverResult && !item.type.endsWith('.create')) return
+  const id = item.entity_id ?? (typeof serverResult?.id === 'string' ? serverResult.id : null)
+  if (!id) return
+  const cacheKey = key(`cache:${path}`)
+  const existing = (await storage.get<CachedEntity[]>(cacheKey)) ?? []
+  const optimistic = {
+    ...item.payload,
+    id,
+    version: 1,
+    created_at: new Date().toISOString(),
+    pending: true,
+    ...(item.type === 'field.create' ? { source: 'manual' } : {}),
+    ...(item.type === 'observation.create' ? { visibility: 'private' } : {}),
+    ...(item.type === 'task.create' ? { status: 'new' } : {}),
+  }
+  const snapshot = serverResult ? { ...serverResult, pending: false } : optimistic
+  const updated = existing.some((row) => row.id === id)
+    ? existing.map((row) => row.id === id ? { ...row, ...snapshot } : row)
+    : [{ ...snapshot, id }, ...existing]
+  await storage.set(cacheKey, updated)
+}
+
 export async function submitCommand(
   type: CommandType, payload: Record<string, unknown>,
   entityId?: string, baseVersion?: number,
@@ -74,6 +108,7 @@ export async function submitCommand(
   if (match?.state === 'rejected') {
     throw new Error(match.message || 'Операция отклонена сервером')
   }
+  await cacheCommand(item, match?.result as Record<string, unknown> | undefined)
   return { queued: !match, result: match?.result as Record<string, unknown> | undefined, entityId: stableId }
 }
 
@@ -96,6 +131,13 @@ export async function flushQueue(): Promise<Result[]> {
         break // No network or expired session: retain queue; never discard operations.
       }
       allResults.push(...response.results)
+      for (const outcome of response.results) {
+        if (outcome.state === 'rejected') continue
+        const source = batch.find((item) => item.client_op_id === outcome.client_op_id)
+        if (source && outcome.result && typeof outcome.result === 'object') {
+          await cacheCommand(source, outcome.result as Record<string, unknown>)
+        }
+      }
       const done = new Set(response.results.filter((r) => r.state !== 'rejected').map((r) => r.client_op_id))
       queue = queue.filter((row) => !done.has(row.client_op_id)).map((row) => {
         const rejected = response.results.find((result) => result.client_op_id === row.client_op_id && result.state === 'rejected')
