@@ -1,8 +1,8 @@
 import { api } from '../api/client'
 import { useAuthStore } from '../auth/store'
-import { IndexedDbPersistence } from '../persistence/indexeddb'
+import { workspacePersistence } from '../persistence/provider'
 
-const storage = new IndexedDbPersistence()
+const storage = workspacePersistence
 
 export type CommandType =
   | 'field.create' | 'field.update' | 'observation.create'

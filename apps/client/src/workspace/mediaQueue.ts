@@ -1,6 +1,6 @@
 import { api } from '../api/client'
 import { useAuthStore } from '../auth/store'
-import { IndexedDbPersistence } from '../persistence/indexeddb'
+import { workspacePersistence } from '../persistence/provider'
 import { uuid7 } from './offline'
 
 type OwnerType = 'observation' | 'task'
@@ -15,7 +15,7 @@ type QueuedMedia = {
   error?: string
 }
 
-const db = new IndexedDbPersistence()
+const db = workspacePersistence
 let sending = false
 
 function key(): string {
