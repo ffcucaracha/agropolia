@@ -160,7 +160,7 @@ async def upload_media(
     return media_view(item)
 
 
-@router.get("/media/content/{media_id}")
+@router.get("/media-file/{media_id}")
 async def get_media_content(
     media_id: UUID,
     context: TenantContext = Depends(get_tenant_context),
