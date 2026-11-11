@@ -23,7 +23,7 @@ export function MediaGallery({ ownerType, ownerId }: { ownerType: OwnerType; own
       }
     }).catch(() => undefined)
     if (media.data) {
-      void Promise.all(media.data.map((item) => apiBlob(`/media/content/${item.id}`)))
+      void Promise.all(media.data.map((item) => apiBlob(`/media-file/${item.id}`)))
         .then((blobs) => {
           const urls = blobs.map((blob) => URL.createObjectURL(blob))
           objectUrls.push(...urls)
