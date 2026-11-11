@@ -9,6 +9,7 @@ from agropolia.config import get_settings
 from agropolia.shared.outbox import OutboxPublisher
 from agropolia.shared.nats import EventEnvelope
 from agropolia.workspace.notify_consumer import consume_task_event
+from agropolia.workspace.scheduler import scheduler_loop
 
 
 async def main() -> None:
@@ -37,9 +38,12 @@ async def main() -> None:
         durable="i1-task-notifications", manual_ack=True, cb=on_task_event,
     )
     publisher = OutboxPublisher(js)
+    scheduler = asyncio.create_task(scheduler_loop(stop))
     try:
         await publisher.run(stop)
     finally:
+        stop.set()
+        await scheduler
         await subscription.unsubscribe()
         await nc.drain()
 
