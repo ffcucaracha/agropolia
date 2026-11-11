@@ -2,6 +2,8 @@ import { FormEvent, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { loadCollection, submitCommand } from './offline'
+import { enqueuePhotos } from './mediaQueue'
+import { MediaGallery } from './MediaGallery'
 import type { Field, Observation, Task, WorkLog } from './types'
 import { taskPriorities, taskStatuses } from './types'
 import { BackLink, ErrorMessage, formatDate, PageHead, PendingTag, StateMessage } from './ui'
@@ -27,6 +29,8 @@ export function TasksPage() {
       <p>{fieldsById.get(task.field_id) ?? 'Поле'} · {taskPriorities[task.priority]}</p>
       <p className="muted">Срок: {formatDate(task.due_at)}</p>
       <PendingTag pending={task.pending} />
+    <MediaGallery ownerType="task" ownerId={task.id} />
+    {task.status === 'in_progress' && <label>Фото подтверждения выполнения<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => setPhotos(Array.from(e.target.files ?? []).slice(0, 10))} /></label>}
     </Link>)}</div>
   </>
 }
@@ -96,6 +100,7 @@ export function TaskDetailPage() {
   const fields = useQuery({ queryKey: ['fields'], queryFn: () => loadCollection<Field>('/fields') })
   const task = tasks.data?.find((item) => item.id === id)
   const [reason, setReason] = useState('')
+  const [photos, setPhotos] = useState<File[]>([])
   const [error, setError] = useState<unknown>(null)
   const [busy, setBusy] = useState(false)
   async function transition(status: Task['status']) {
@@ -103,6 +108,7 @@ export function TaskDetailPage() {
     setBusy(true); setError(null)
     try {
       await submitCommand('task.transition', { status, blocked_reason: status === 'blocked' ? reason : null }, task.id, task.version)
+      if (status === 'done' && photos.length) await enqueuePhotos('task', task.id, photos)
       await client.invalidateQueries({ queryKey: ['tasks'] })
       await client.invalidateQueries({ queryKey: ['work-log'] })
     } catch (e) { setError(e) }
