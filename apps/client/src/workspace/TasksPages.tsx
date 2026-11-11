@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { loadCollection, submitCommand } from './offline'
@@ -41,6 +41,7 @@ export function TaskFormPage() {
   const fields = useQuery({ queryKey: ['fields'], queryFn: () => loadCollection<Field>('/fields') })
   const obs = useQuery({ queryKey: ['observations'], queryFn: () => loadCollection<Observation>('/observations') })
   const [fieldId, setFieldId] = useState(params.get('field') ?? '')
+  useEffect(() => { if (!fieldId && fields.data?.length === 1) setFieldId(fields.data[0].id) }, [fieldId, fields.data])
   const observationId = params.get('observation')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
