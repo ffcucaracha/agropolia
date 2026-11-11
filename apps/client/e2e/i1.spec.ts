@@ -67,6 +67,7 @@ test('I-1 offline observation is stored and synced after reconnect', async ({ pa
   await page.getByLabel('Культура').fill('Овёс')
   await page.getByLabel('Площадь, га').fill('20')
   await page.getByRole('button', { name: 'Сохранить поле' }).click()
+  await expect(page.getByRole('heading', { name: 'Поле офлайн' })).toBeVisible()
   // Reload directly into a field form to assert the persisted session and
   // field cache are ready before the simulated network interruption.
   await page.goto('/app/observations/new')
