@@ -4,6 +4,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuthStore, type Me } from '../auth/store'
 import { flushQueue, onQueueChange, queueCount } from './offline'
+import { flushMedia } from './mediaQueue'
 
 const links = [
   { to: '/app', name: 'Сегодня', end: true },
@@ -41,7 +42,8 @@ export function WorkspaceLayout() {
     const update = () => { void queueCount().then(setPending).catch(() => undefined) }
     const sync = () => {
       setOnline(navigator.onLine)
-      void flushQueue().then((results) => {
+      void flushQueue().then(async (results) => {
+        await flushMedia()
         if (results.length) void queryClient.invalidateQueries()
         update()
       }).catch(() => undefined)
