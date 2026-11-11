@@ -1,6 +1,6 @@
 # I-0 — Capacitor technical spike
 
-Статус: **частично выполнен; device validation остаётся обязательной перед закрытием I-0**.
+Статус: **частично выполнен; device validation Android/iOS отложена и не блокирует закрытие web-first I-0**.
 
 ## Что проверено в рамках автономной реализации
 
@@ -123,3 +123,26 @@ Blocker закрыт, когда:
 - не осталось capability со статусом `unknown`.
 
 Официальные требования Capacitor 8 к окружению: https://capacitorjs.com/docs/getting-started/environment-setup
+
+
+## Решение 2026-11-11: web-first
+
+Для I-0 принято решение сосредоточиться на web-версии. Android/iOS device validation не является blocking exit criterion этой итерации.
+
+Что подтверждено для web-first I-0:
+- browser E2E проходит;
+- backend/frontend infrastructure проходит CI;
+- реальная доставка email OTP проверена через test SMTP/mail catcher.
+
+Что переносится на отдельный mobile-readiness этап:
+- Android/iOS secure storage runtime validation;
+- SQLite на устройстве;
+- camera/GPS permissions;
+- MapLibre/offline tiles;
+- background execution;
+- OS kill/recovery;
+- push;
+- media upload/resume;
+- network reconnect в native runtime.
+
+Этот перенос не отменяет проверку; он меняет только момент её выполнения.
